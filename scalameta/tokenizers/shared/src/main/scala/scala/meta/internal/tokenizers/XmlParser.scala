@@ -1,12 +1,13 @@
 package scala.meta.internal.tokenizers
 
-import scala.annotation.switch
 import scala.meta.Dialect
 import scala.meta.inputs.Input
 
-import scala.meta.internal.fastparse._
-import scala.meta.internal.fastparse.NoWhitespace._
+import scala.annotation.switch
 import scala.annotation.tailrec
+
+import fastparse.NoWhitespace._
+import fastparse._
 
 /**
  * Copy-pasta from this lihaoyi comment:
@@ -25,19 +26,14 @@ class XmlParser(dialect: Dialect) {
   def XmlPattern[_: P]: P0 = P(Xml.ElemPattern)
 
   private[this] object Xml {
-    def Element[_: P] = P(
-      TagHeader ~/ ("/>" | ">" ~/ Content ~/ ETag)
-    ) // FIXME tag must be balanced
+    def Element[_: P] = P(TagHeader ~/ ("/>" | ">" ~/ Content ~/ ETag)) // FIXME tag must be balanced
     def TagHeader[_: P] = P("<" ~ Name ~/ (S ~ Attribute).rep ~ S.?)
     def ETag[_: P] = P("</" ~ Name ~ S.? ~ ">")
 
     def Attribute[_: P] = P(Name ~/ Eq ~/ AttValue)
     def Eq[_: P] = P(S.? ~ "=" ~ S.?)
-    def AttValue[_: P] = P(
-      "\"" ~/ (CharQ | Reference).rep ~ "\"" |
-        "'" ~/ (CharA | Reference).rep ~ "'" |
-        ScalaExpr
-    )
+    def AttValue[_: P] =
+      P("\"" ~/ (CharQ | Reference).rep ~ "\"" | "'" ~/ (CharA | Reference).rep ~ "'" | ScalaExpr)
 
     def Content[_: P] = P((CharData | Reference | ScalaExpr | XmlContent).rep)
     def XmlContent[_: P]: P0 = P(Unparsed | CDSect | PI | Comment | Element)
@@ -75,8 +71,8 @@ class XmlParser(dialect: Dialect) {
     def CharB[_: P] = P(!("{" | "}") ~ Char1)
 
     // discard result
-    def Name[_: P]: P0 =
-      P(NameStart ~ NameChar.rep).!.filter(_.last != ':').opaque("Name").map(_ => ())
+    def Name[_: P]: P0 = P(NameStart ~ NameChar.rep).!.filter(_.last != ':').opaque("Name")
+      .map(_ => ())
     def NameStart[_: P] = P(CharPred(isNameStart))
     def NameChar[_: P] = P(CharPred(isNameChar))
 
@@ -103,11 +99,11 @@ class XmlParser(dialect: Dialect) {
       import java.lang.Character._
       // The constants represent groups Mc, Me, Mn, Lm, and Nd.
 
-      isNameStart(ch) || (getType(ch).toByte match {
+      isNameStart(ch) ||
+      (getType(ch).toByte match {
         case COMBINING_SPACING_MARK | ENCLOSING_MARK | NON_SPACING_MARK | MODIFIER_LETTER |
-            DECIMAL_DIGIT_NUMBER =>
-          true
-        case _ => ".-:" contains ch
+            DECIMAL_DIGIT_NUMBER => true
+        case _ => ".-:".contains(ch)
       })
     }
 
@@ -124,8 +120,7 @@ class XmlParser(dialect: Dialect) {
 
       getType(ch).toByte match {
         case LOWERCASE_LETTER | UPPERCASE_LETTER | OTHER_LETTER | TITLECASE_LETTER |
-            LETTER_NUMBER =>
-          true
+            LETTER_NUMBER => true
         case _ => ch == '_'
       }
     }
@@ -143,31 +138,27 @@ class ScalaExprPositionParser(dialect: Dialect) {
   def splicePositions: List[XmlTokenRange] = _splicePositions.result()
 
   def blockRun = { implicit ctx: ParsingRun[_] =>
-    var curlyBraceCount = 1
-    val input = ctx.input
     val index = ctx.index
-    val scanner =
-      new LegacyScanner(Input.String(input.slice(index, input.length)), dialect)
-    scanner.reader.nextChar()
+    val input = Input.String(ctx.input.slice(index, ctx.input.length))
+    val scanner = new LegacyScanner(input, dialect)
+    scanner.initialize()
+
+    def getNextIndex(ltd: LegacyTokenData) = index + ltd.offset
 
     @tailrec
-    def rec(curlyBraceCount: Int): Boolean = {
-      scanner.nextToken()
-      (scanner.curr.token: @switch) match {
+    def rec(curlyBraceCount: Int): ParsingRun[Unit] = {
+      val ltd = scanner.nextToken()
+      (ltd.token: @switch) match {
+        case LegacyToken.RBRACE if curlyBraceCount == 0 =>
+          val nextIndex = getNextIndex(ltd)
+          _splicePositions += XmlTokenRange(index, nextIndex)
+          ctx.freshSuccessUnit(index = nextIndex)
+        case LegacyToken.EOF => ctx.freshFailure(getNextIndex(ltd))
         case LegacyToken.LBRACE => rec(curlyBraceCount + 1)
-        case LegacyToken.RBRACE if curlyBraceCount == 1 => true
         case LegacyToken.RBRACE => rec(curlyBraceCount - 1)
-        case LegacyToken.EOF => false
         case _ => rec(curlyBraceCount)
       }
     }
-    val parsedSuccesfully = rec(1)
-    val nextIndex = index + scanner.curr.offset
-    if (parsedSuccesfully) {
-      _splicePositions += XmlTokenRange(index, nextIndex)
-      ctx.freshSuccessUnit(index = nextIndex)
-    } else {
-      ctx.freshFailure(nextIndex)
-    }
+    rec(0)
   }
 }

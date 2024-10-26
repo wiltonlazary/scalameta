@@ -1,9 +1,11 @@
 package scala.meta.tests
 package integrity
 
-import munit._
 import java.io.File
-import java.io.File.{separator, pathSeparator}
+import java.io.File.pathSeparator
+import java.io.File.separator
+
+import munit._
 
 class IntegritySuite extends FunSuite {
   // NOTE: Here's a real-life issue that this test suite has detected.
@@ -22,9 +24,9 @@ class IntegritySuite extends FunSuite {
 
     var success = true
     val relpaths = scala.collection.mutable.Map[String, String]()
-    cp.foreach(dir => {
+    cp.foreach { dir =>
       val classfiles = deepfiles(new File(dir)).map(_.getAbsolutePath).filter(_.endsWith(".class"))
-      classfiles.foreach(abspath => {
+      classfiles.foreach { abspath =>
         var relpath = abspath.substring(dir.length)
         if (relpath.startsWith(separator)) relpath = relpath.substring(1)
         relpath = relpath.toLowerCase
@@ -32,11 +34,9 @@ class IntegritySuite extends FunSuite {
         if (relpaths.contains(relpath)) {
           success = false
           Console.err.println(s"Overlapping classfiles: ${relpaths(relpath)} and $abspath")
-        } else {
-          relpaths(relpath) = abspath
-        }
-      })
-    })
+        } else relpaths(relpath) = abspath
+      }
+    }
 
     if (!success) fail("Detected overlapping classfiles")
   }

@@ -2,12 +2,14 @@ package scala.meta.tests
 package semanticdb
 
 import org.scalameta.logger
-import munit.FunSuite
 import scala.meta.interactive.InteractiveSemanticdb._
 import scala.meta.internal.semanticdb.Print
+
+import scala.collection.SortedMap
 import scala.tools.nsc.interactive.Global
 import scala.util.Properties
-import scala.collection.SortedMap
+
+import munit.FunSuite
 
 class InteractiveSuite extends FunSuite {
   val option =
@@ -16,16 +18,14 @@ class InteractiveSuite extends FunSuite {
   def check(
       original: String,
       expected: String,
-      compat: List[(String, String)] = List.empty
-  ): Unit = {
-    test(logger.revealWhitespace(original)) {
-      val options = List("-P:semanticdb:synthetics:on", "-P:semanticdb:text:on")
-      val document = toTextDocument(compiler, original, options)
-      val format = scala.meta.metap.Format.Detailed
-      val syntax = Print.document(format, document)
-      val expectedCompat = ScalaVersion.getExpected(compat, expected)
-      assertNoDiff(syntax, expectedCompat)
-    }
+      compat: List[(ScalaVersion.Version, String)] = List.empty
+  ): Unit = test(logger.revealWhitespace(original)) {
+    val options = List("-P:semanticdb:synthetics:on", "-P:semanticdb:text:on")
+    val document = toTextDocument(compiler, original, options)
+    val format = scala.meta.metap.Format.Detailed
+    val syntax = Print.document(format, document)
+    val expectedCompat = ScalaVersion.getExpected(compat, expected)
+    assertNoDiff(syntax, expectedCompat)
   }
 
   def expected(occurrences: Int, listOccurences: String, applySynth: String) =
@@ -95,31 +95,30 @@ class InteractiveSuite extends FunSuite {
   )
 
   check(
-    """package b
-      |import scala.concurrent.Future
-      |object a {
-      |  val x = _root_.scala.List()
-      |  x + "string"
-      |}
-    """.stripMargin,
+    """|package b
+       |import scala.concurrent.Future
+       |object a {
+       |  val x = _root_.scala.List()
+       |  x + "string"
+       |}
+       |""".stripMargin,
     // Note that scala don't resolve to a symbol, this is a sign that the
     // typer hijacking is not working as expected with interactive.Global.
     expectedPrevious,
     compat = List(
-      "2.13.3" -> expectedPrevious213,
-      "2.13.2" -> expectedPrevious213,
-      "2.13.1" -> expectedPrevious213,
-      "2.13.0" -> expectedPrevious213,
-      "2.13" -> expectedLatest
+      ScalaVersion.Full("2.13.3") -> expectedPrevious213,
+      ScalaVersion.Full("2.13.2") -> expectedPrevious213,
+      ScalaVersion.Full("2.13.1") -> expectedPrevious213,
+      ScalaVersion.Scala213 -> expectedLatest
     )
   )
 
   // This tests a case where SymbolOps.toSemantic crashes
   check(
-    """
-      |object b {
-      |  def add(a: In) = 1
-      |}""".stripMargin,
+    """|
+       |object b {
+       |  def add(a: In) = 1
+       |}""".stripMargin,
     """|interactive.scala
        |-----------------
        |
@@ -148,6 +147,6 @@ class InteractiveSuite extends FunSuite {
        |
        |Diagnostics:
        |[2:13..2:15) [error] not found: type In
-    """.stripMargin
+       |""".stripMargin
   )
 }

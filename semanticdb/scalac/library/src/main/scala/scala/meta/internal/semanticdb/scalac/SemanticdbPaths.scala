@@ -11,18 +11,14 @@ object SemanticdbPaths {
   private val scalaExtension = "scala"
   private val scalaScriptExtension = "sc"
 
-  def isSemanticdb(path: RelativePath): Boolean = {
-    path.toNIO.startsWith(semanticdbPrefix.toNIO) &&
+  def isSemanticdb(path: RelativePath): Boolean = path.toNIO.startsWith(semanticdbPrefix.toNIO) &&
     PathIO.extension(path.toNIO) == semanticdbExtension
-  }
 
   def toScala(
       semanticdb: AbsolutePath,
       sourceroot: AbsolutePath,
       targetroot: AbsolutePath
-  ): AbsolutePath = {
-    sourceroot.resolve(toScala(semanticdb.toRelative(targetroot)))
-  }
+  ): AbsolutePath = sourceroot.resolve(toScala(semanticdb.toRelative(targetroot)))
 
   def toScala(path: RelativePath): RelativePath = {
     require(isSemanticdb(path))
@@ -50,8 +46,7 @@ object SemanticdbPaths {
   def toSemanticdb(doc: s.TextDocument, targetroot: AbsolutePath): AbsolutePath = {
     val targetrootWithSemanticdbPrefix = targetroot.resolve(semanticdbPrefix)
     // Doing this operation in URI space is important if doc.uri contains encoded chars:
-    val uri = targetrootWithSemanticdbPrefix
-      .toURI(isDirectory = true)
+    val uri = targetrootWithSemanticdbPrefix.toURI(isDirectory = true)
       .resolve(doc.uri + "." + semanticdbExtension)
     AbsolutePath.fromAbsoluteUri(uri)
   }

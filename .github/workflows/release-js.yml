@@ -1,0 +1,27 @@
+name: Release JS
+on:
+  push:
+    tags: ["*"]
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    if: ${{ !contains(github.ref, 'semanticdb') }}
+    steps:
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "18"
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Set up JVM
+        uses: actions/setup-java@v4
+        with:
+          java-version: '8'
+          distribution: 'temurin'
+          cache: 'sbt'
+      - uses: sbt/setup-sbt@v1
+      - name: Publish
+        run: sbt "parsersJS/npmPackageNpmrc; parsersJS/npmPackagePublish"
+        env:
+          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+

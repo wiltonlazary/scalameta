@@ -1,13 +1,14 @@
 package scala.meta.testkit
 
+import scala.meta.internal.io.FileIO
 import scala.meta.io.AbsolutePath
+import scala.meta.io.RelativePath
+
 import java.io.File
 import java.nio.charset.Charset
 import java.nio.charset.StandardCharsets
 import java.nio.file.Files
 import java.nio.file.StandardOpenOption
-import scala.meta.internal.io.FileIO
-import scala.meta.io.RelativePath
 
 object StringFS {
 
@@ -39,24 +40,20 @@ object StringFS {
       root: AbsolutePath = AbsolutePath(Files.createTempDirectory("scalameta")),
       charset: Charset = StandardCharsets.UTF_8
   ): AbsolutePath = {
-    if (layout.trim.nonEmpty) {
-      layout.split("(?=\n/)").foreach { row =>
-        row.stripPrefix("\n").split("\n", 2).toList match {
-          case path :: contents :: Nil =>
-            val file = root.resolve(path.stripPrefix("/"))
-            Files.createDirectories(file.toNIO.getParent)
-            Files.write(
-              file.toNIO,
-              contents.getBytes(charset),
-              StandardOpenOption.CREATE,
-              StandardOpenOption.TRUNCATE_EXISTING
-            )
-          case els =>
-            throw new IllegalArgumentException(
-              s"Unable to split argument info path/contents! \n$els"
-            )
+    if (layout.trim.nonEmpty) layout.split("(?=\n/)").foreach { row =>
+      row.stripPrefix("\n").split("\n", 2).toList match {
+        case path :: contents :: Nil =>
+          val file = root.resolve(path.stripPrefix("/"))
+          Files.createDirectories(file.toNIO.getParent)
+          Files.write(
+            file.toNIO,
+            contents.getBytes(charset),
+            StandardOpenOption.CREATE,
+            StandardOpenOption.TRUNCATE_EXISTING
+          )
+        case els =>
+          throw new IllegalArgumentException(s"Unable to split argument info path/contents! \n$els")
 
-        }
       }
     }
     root
@@ -85,20 +82,11 @@ object StringFS {
       root: AbsolutePath,
       includePath: RelativePath => Boolean = _ => true,
       charset: Charset = StandardCharsets.UTF_8
-  ): String = {
-    import scala.collection.JavaConverters._
-    FileIO
-      .listAllFilesRecursively(root)
-      .files
-      .filter(includePath)
-      .sortBy(_.toNIO)
-      .map { path =>
-        val contents = FileIO.slurp(root.resolve(path), charset)
-        s"""|/$path
-            |$contents""".stripMargin
-      }
-      .mkString("\n")
-      .replace(File.separatorChar, '/') // ensure original separators
-  }
+  ): String = FileIO.listAllFilesRecursively(root).files.filter(includePath).sortBy(_.toNIO)
+    .map { path =>
+      val contents = FileIO.slurp(root.resolve(path), charset)
+      s"""|/$path
+          |$contents""".stripMargin
+    }.mkString("\n").replace(File.separatorChar, '/') // ensure original separators
 
 }

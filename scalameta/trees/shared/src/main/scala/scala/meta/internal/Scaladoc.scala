@@ -36,7 +36,7 @@ object Scaladoc {
     override def syntax: String = {
       val sb = new StringBuilder
       sb.append("[[").append(ref)
-      anchor.foreach { x => sb.append(' ').append(x) }
+      anchor.foreach(x => sb.append(' ').append(x))
       sb.append("]]").append(punct)
       sb.result()
     }
@@ -45,6 +45,16 @@ object Scaladoc {
   /** A single embedded code expression */
   final case class CodeExpr(code: String, punct: String = "") extends TextPart {
     override def syntax: String = s"{{{$code}}}$punct"
+  }
+
+  /** A markdown code span, an embedded code expression */
+  final case class MdCodeSpan(code: String, fence: String, punct: String = "") extends TextPart {
+    override def syntax: String = s"$fence$code$fence$punct"
+  }
+
+  /** Represents an enclosed tagged documentation remark */
+  final case class EnclosedJavaTag(tag: String, desc: Seq[String] = Nil) extends TextPart {
+    override def syntax: String = (tag +: desc).mkString("{", " ", "}")
   }
 
   /** A block of one or more lines of code */
@@ -59,11 +69,8 @@ object Scaladoc {
   /**
    * A table [[https://www.scala-lang.org/blog/2018/10/04/scaladoc-tables.html]]
    */
-  final case class Table(
-      header: Table.Row,
-      align: Seq[Table.Align],
-      rows: Seq[Table.Row]
-  ) extends Term
+  final case class Table(header: Table.Row, align: Seq[Table.Align], rows: Seq[Table.Row])
+      extends Term
 
   object Table {
 
@@ -96,11 +103,20 @@ object Scaladoc {
 
   /* List blocks */
 
+  sealed abstract class ListType
+  object ListType {
+    type Base = ListType
+    case object Bullet extends Base
+    case object Decimal extends Base
+    case object Roman extends Base
+    case object Alpha extends Base
+  }
+
   /** Represents a list item */
-  final case class ListItem(text: Text, terms: Seq[Term] = Nil)
+  final case class ListItem(prefix: String, text: Text, terms: Seq[Term] = Nil)
 
   /** Represents a list block */
-  final case class ListBlock(prefix: String, items: Seq[ListItem]) extends Term
+  final case class ListBlock(listType: ListType, items: Seq[ListItem]) extends Term
 
   /* Tags */
 
@@ -257,8 +273,7 @@ object Scaladoc {
 
     val tagTypeMap = predefined.map(x => x.tag -> x).toMap
 
-    def getTag(tag: String): TagType =
-      tagTypeMap.getOrElse(tag, TagType.UnknownTag(tag))
+    def getTag(tag: String): TagType = tagTypeMap.getOrElse(tag, TagType.UnknownTag(tag))
   }
 
 }

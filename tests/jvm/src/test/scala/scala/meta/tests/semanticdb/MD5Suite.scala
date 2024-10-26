@@ -1,18 +1,23 @@
 package scala.meta.tests.semanticdb
 
+import scala.meta.internal.semanticdb.Locator
+import scala.meta.internal.semanticdb.scalac.Hex
+import scala.meta.internal.semanticdb.scalac.SemanticdbPaths
+import scala.meta.io.AbsolutePath
+import scala.meta.io.RelativePath
+import scala.meta.tests.BuildInfo
+import scala.meta.tests.Slow
+
 import java.nio.charset.StandardCharsets
-import java.nio.file.{Files, Path, Paths}
+import java.nio.file.Files
+import java.nio.file.Path
+import java.nio.file.Paths
 import java.security.DigestInputStream
 import java.security.MessageDigest
 
-import munit.FunSuite
-import scala.meta.tests.Slow
-
 import scala.collection.mutable
-import scala.meta.internal.semanticdb.Locator
-import scala.meta.internal.semanticdb.scalac.{Hex, SemanticdbPaths}
-import scala.meta.io.{AbsolutePath, RelativePath}
-import scala.meta.tests.BuildInfo
+
+import munit.FunSuite
 
 class MD5Suite extends FunSuite {
 
@@ -20,11 +25,8 @@ class MD5Suite extends FunSuite {
     val fos = Files.newInputStream(file.toNIO)
     val md = MessageDigest.getInstance("MD5")
     val dis = new DigestInputStream(fos, md)
-    try {
-      while (dis.read() != -1) ()
-    } finally {
-      fos.close()
-    }
+    try while (dis.read() != -1) ()
+    finally fos.close()
     Hex.bytesToHex(md.digest())
   }
 
@@ -41,10 +43,7 @@ class MD5Suite extends FunSuite {
     val doc = docs.documents.head
     test(doc.uri.tag(Slow)) {
       val fromText = stringMD5(doc.text)
-      assert(
-        doc.md5 == fromText,
-        "TextDocument.md5 does not match stringMD5(TextDocument.md5)"
-      )
+      assertEquals(doc.md5, fromText, "TextDocument.md5 does not match stringMD5(TextDocument.md5)")
 
       val scalaFile = {
         val targetroot = AbsolutePath(databaseClasspath)
@@ -53,8 +52,9 @@ class MD5Suite extends FunSuite {
       }
 
       val fromFile = fileMD5(scalaFile)
-      assert(
-        doc.md5 == fromFile,
+      assertEquals(
+        doc.md5,
+        fromFile,
         "TextDocument.md5 does not match fileMD5(Paths.get(TextDocument.uri))"
       )
       assert(!md5Fingerprints.contains(doc.md5), "Fingerprint was not unique")

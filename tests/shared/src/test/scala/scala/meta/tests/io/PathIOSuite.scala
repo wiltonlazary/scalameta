@@ -1,17 +1,17 @@
 package scala.meta.tests.io
 
-import munit.FunSuite
 import scala.meta.internal.io.PathIO
 
-class PathIOSuite extends FunSuite {
-  def check(path: String, expectedDir: String, expectedName: String): Unit =
-    test(path) {
-      val obtainedDir = PathIO.dirname(path)
-      assert(obtainedDir == expectedDir, "Unexpected dirName")
+import munit.FunSuite
 
-      val obtainedName = PathIO.basename(path)
-      assert(obtainedName == expectedName, "Unexpected baseName")
-    }
+class PathIOSuite extends FunSuite {
+  def check(path: String, expectedDir: String, expectedName: String): Unit = test(path) {
+    val obtainedDir = PathIO.dirname(path)
+    assertEquals(obtainedDir, expectedDir, "Unexpected dirName")
+
+    val obtainedName = PathIO.basename(path)
+    assertEquals(obtainedName, expectedName, "Unexpected baseName")
+  }
 
   check("/", "/", "")
   check("//", "/", "")

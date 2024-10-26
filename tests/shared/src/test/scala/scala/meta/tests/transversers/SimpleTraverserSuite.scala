@@ -1,11 +1,10 @@
 package scala.meta.tests.transversers
 
-import munit._
-
 import scala.meta._
+import scala.meta.tests.TreeSuiteBase
 import scala.meta.transversers.SimpleTraverser
 
-class SimpleTraverserSuite extends FunSuite {
+class SimpleTraverserSuite extends TreeSuiteBase {
 
   test("Traverser Ok") {
     val tree0 = q"""
@@ -22,40 +21,48 @@ class SimpleTraverserSuite extends FunSuite {
       }
     }
     traverser(tree0)
-    assert(
-      log
-        .mkString("\n")
-        .replace("\r", "") == """
-      |{   def foo(x: x)(x: Int) = x + x   class C(x: x) { def bar(x: x) = ??? } }
-      |def foo(x: x)(x: Int) = x + x
-      |foo
-      |x: x
-      |x
-      |x
-      |x: Int
-      |x
-      |Int
-      |x + x
-      |x
-      |+
-      |x
-      |class C(x: x) { def bar(x: x) = ??? }
-      |C
-      |def this(x: x)
-      |_
-      |x: x
-      |x
-      |x
-      |{ def bar(x: x) = ??? }
-      |_
-      |_
-      |def bar(x: x) = ???
-      |bar
-      |x: x
-      |x
-      |x
-      |???
-    """.trim.stripMargin
+    assertEquals(
+      log.mkString("", "\n", "\n").nl2lf,
+      """|def foo(x: x)(x: Int) = x + x       class C(x: x) {         def bar(x: x) = ???       }
+         |def foo(x: x)(x: Int) = x + x
+         |foo
+         |(x: x)(x: Int)
+         |
+         |(x: x)
+         |x: x
+         |x
+         |x
+         |(x: Int)
+         |x: Int
+         |x
+         |Int
+         |x + x
+         |x
+         |+
+         |
+         |x
+         |x
+         |class C(x: x) {         def bar(x: x) = ???       }
+         |C
+         |
+         |def this(x: x)
+         |
+         |(x: x)
+         |x: x
+         |x
+         |x
+         |{         def bar(x: x) = ???       }
+         |{         def bar(x: x) = ???       }
+         |def bar(x: x) = ???
+         |bar
+         |(x: x)
+         |
+         |(x: x)
+         |x: x
+         |x
+         |x
+         |???
+         |""".stripMargin
     )
   }
 
@@ -63,20 +70,18 @@ class SimpleTraverserSuite extends FunSuite {
     var cnt = 0
     val tree0 = q"x + y"
     tree0.traverse { case Term.Name(s) => cnt += 1 }
-    assert(cnt == 3)
+    assertEquals(cnt, 3)
   }
 
   test("Tree.collect") {
     val tree0 = q"x + y"
     val result1 = tree0.collect { case Term.Name(s) => s }
-    assert(result1.toString == "List(x, +, y)")
+    assertEquals(result1.toString, "List(x, +, y)")
   }
 
   test("#1200") {
     var i = 0
-    val fn: PartialFunction[Tree, Tree] = {
-      case q"A" if { i += 1; i < 2 } => q"B"
-    }
+    val fn: PartialFunction[Tree, Tree] = { case q"A" if { i += 1; i < 2 } => q"B" }
     q"A".collect(fn)
     i = 0
     q"A".traverse(fn.andThen(_ => ()))

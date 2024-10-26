@@ -1,9 +1,12 @@
 package org.scalameta
 package os
 
+import sbt.io.IO
+
 import java.io._
-import scala.sys.process._
+
 import scala.compat.Platform.EOL
+import scala.sys.process._
 
 object shell {
   def exec(command: String, cwd: String = "."): (Int, String, String) = {
@@ -13,8 +16,7 @@ object shell {
       var done = false
       while (!done) {
         val line = reader.readLine()
-        if (line != null) builder.append(line + EOL)
-        else done = true
+        if (line != null) builder.append(line + EOL) else done = true
       }
       builder.toString
     }
@@ -44,34 +46,28 @@ object shell {
 object secret {
   def obtain(domain: String): Option[(String, String)] = {
     val credentialsFile = sys.props(domain + ".settings.file")
-    if (credentialsFile != null) {
+    if (credentialsFile != null)
       try {
         import scala.xml._
         val settings = XML.loadFile(credentialsFile)
-        def readServerConfig(key: String) =
-          (settings \\ "settings" \\ "servers" \\ "server" \\ key).head.text
+        def readServerConfig(key: String) = (settings \\ "settings" \\ "servers" \\ "server" \\ key)
+          .head.text
         Some((readServerConfig("username"), readServerConfig("password")))
-      } catch {
-        case ex: Exception => None
-      }
-    } else {
-      for {
-        username <- sys.env.get(s"${domain.toUpperCase}_USERNAME")
-        password <- sys.env.get(s"${domain.toUpperCase}_PASSWORD")
-      } yield {
-        (username, password)
-      }
-    }
+      } catch { case ex: Exception => None }
+    else for {
+      username <- sys.env.get(s"${domain.toUpperCase}_USERNAME")
+      password <- sys.env.get(s"${domain.toUpperCase}_PASSWORD")
+    } yield (username, password)
   }
 }
 
 object temp {
   def mkdir(): File = {
     val temp = File.createTempFile("temp", System.nanoTime.toString)
-    if (!temp.delete)
-      sys.error("failed to create a temporary directory: can't delete " + temp.getAbsolutePath)
-    if (!temp.mkdir)
-      sys.error("failed to create a temporary directory: can't mkdir " + temp.getAbsolutePath)
+    if (!temp.delete) sys
+      .error("failed to create a temporary directory: can't delete " + temp.getAbsolutePath)
+    if (!temp.mkdir) sys
+      .error("failed to create a temporary directory: can't mkdir " + temp.getAbsolutePath)
     temp
   }
 }
@@ -82,13 +78,13 @@ object shutil {
     if (!file.delete) sys.error(s"failed to delete ${file.getAbsolutePath}")
   }
 
-  def copytree(src: File, dest: File): Unit = {
+  def copytree(src: File, dest: File): Unit =
     if (src.isDirectory) {
       if (!dest.mkdirs) sys.error(s"failed to create ${dest.getAbsolutePath}")
-      src.listFiles.foreach(srcsub => {
+      src.listFiles.foreach { srcsub =>
         val destsub = new File(dest.getAbsolutePath + File.separator + srcsub.getName)
         copytree(srcsub, destsub)
-      })
+      }
     } else {
       val in = new FileInputStream(src)
       try {
@@ -98,17 +94,11 @@ object shutil {
           var done = false
           while (!done) {
             val len = in.read(buf)
-            if (len > 0) out.write(buf, 0, len)
-            else done = true
+            if (len > 0) out.write(buf, 0, len) else done = true
           }
-        } finally {
-          out.close()
-        }
-      } finally {
-        in.close()
-      }
+        } finally out.close()
+      } finally in.close()
     }
-  }
 }
 
 object git {
@@ -129,12 +119,10 @@ object git {
   }
 
   def distance(from: String, to: String): Int = {
-    def ncommits(ref: String) =
-      shell.check_output(s"git rev-list $ref --count", cwd = ".").trim.toInt
+    def ncommits(ref: String) = shell.check_output(s"git rev-list $ref --count", cwd = ".").trim
+      .toInt
     ncommits(to) - ncommits(from)
   }
 
-  def currentSha(): String = {
-    shell.check_output("git rev-parse HEAD", cwd = ".").trim
-  }
+  def currentSha(): String = shell.check_output("git rev-parse HEAD", cwd = ".").trim
 }

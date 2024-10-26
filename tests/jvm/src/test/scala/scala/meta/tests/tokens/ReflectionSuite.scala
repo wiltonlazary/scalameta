@@ -1,12 +1,12 @@
 package scala.meta.tests
 package tokens
 
-import munit._
-import scala.compat.Platform.EOL
-import scala.reflect.runtime.{universe => ru}
-import scala.reflect.runtime.universe._
+import org.scalameta.internal.ScalaCompat.EOL
 
-class ReflectionSuite extends FunSuite {
+import scala.reflect.runtime.universe._
+import scala.reflect.runtime.{universe => ru}
+
+class ReflectionSuite extends TreeSuiteBase {
   object TokenReflection
       extends {
         val u: ru.type = ru
@@ -19,37 +19,42 @@ class ReflectionSuite extends FunSuite {
   test("freeform tokens") {
     assertNoDiff(
       tokens.filter(_.isFreeform).map(_.prefix).sorted.mkString(EOL),
-      """
-      |Token.BOF
-      |Token.Comment
-      |Token.Constant.Char
-      |Token.Constant.Double
-      |Token.Constant.Float
-      |Token.Constant.Int
-      |Token.Constant.Long
-      |Token.Constant.String
-      |Token.Constant.Symbol
-      |Token.EOF
-      |Token.Ellipsis
-      |Token.Ident
-      |Token.Indentation.Indent
-      |Token.Indentation.Outdent
-      |Token.Interpolation.End
-      |Token.Interpolation.Id
-      |Token.Interpolation.Part
-      |Token.Interpolation.SpliceEnd
-      |Token.Interpolation.SpliceStart
-      |Token.Interpolation.Start
-      |Token.LFLF
-      |Token.LeftArrow
-      |Token.RightArrow
-      |Token.Unquote
-      |Token.Xml.End
-      |Token.Xml.Part
-      |Token.Xml.SpliceEnd
-      |Token.Xml.SpliceStart
-      |Token.Xml.Start
-    """.trim.stripMargin.split('\n').mkString(EOL)
+      """|
+         |Token.BOF
+         |Token.Comment
+         |Token.Constant.Char
+         |Token.Constant.Double
+         |Token.Constant.Float
+         |Token.Constant.Int
+         |Token.Constant.Long
+         |Token.Constant.String
+         |Token.Constant.Symbol
+         |Token.EOF
+         |Token.Ellipsis
+         |Token.Ident
+         |Token.Indentation.Indent
+         |Token.Indentation.Outdent
+         |Token.InfixLF
+         |Token.Interpolation.End
+         |Token.Interpolation.Id
+         |Token.Interpolation.Part
+         |Token.Interpolation.SpliceEnd
+         |Token.Interpolation.SpliceStart
+         |Token.Interpolation.Start
+         |Token.Invalid
+         |Token.LFLF
+         |Token.LeftArrow
+         |Token.MultiHS
+         |Token.MultiNL
+         |Token.RightArrow
+         |Token.Shebang
+         |Token.Unquote
+         |Token.Xml.End
+         |Token.Xml.Part
+         |Token.Xml.SpliceEnd
+         |Token.Xml.SpliceStart
+         |Token.Xml.Start
+         |""".stripMargin.lf2nl
     )
   }
 }

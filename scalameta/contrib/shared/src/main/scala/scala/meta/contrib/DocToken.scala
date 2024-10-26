@@ -1,38 +1,31 @@
 package scala.meta.contrib
 
-import scala.meta.internal.fastparse._
-import scala.meta.internal.fastparse.NoWhitespace._
+import fastparse.NoWhitespace._
+import fastparse._
 
 /**
  * Represents a scaladoc line.
  */
 case class DocToken(kind: DocToken.Kind, name: Option[String], body: Option[String]) {
 
-  override def toString: String = {
-    ((name, body) match {
-      case (Some(n), _) => s"$kind(name=$n, body=${body.getOrElse("")})"
-      case (None, Some(kindBody)) => s"$kind($kindBody)"
-      case _ => kind.toString
-    }).replaceAll("\n", " ")
-  }
+  override def toString: String = ((name, body) match {
+    case (Some(n), _) => s"$kind(name=$n, body=${body.getOrElse("")})"
+    case (None, Some(kindBody)) => s"$kind($kindBody)"
+    case _ => kind.toString
+  }).replaceAll("\n", " ")
 
   /**
    * Obtains all the code references from this DocToken.
    */
-  def references: List[DocToken.Reference] =
-    body
-      .map { b =>
-        def parseBodyFrom(idx: Int): List[DocToken.Reference] = {
-          parse(b, DocToken.referenceParser(_), startIndex = idx) match {
-            case Parsed.Success(value, index) =>
-              List(DocToken.Reference(value)) ++ parseBodyFrom(index)
-            case _ => List[DocToken.Reference]()
-          }
-        }
-
-        parseBodyFrom(0)
+  def references: List[DocToken.Reference] = body.map { b =>
+    def parseBodyFrom(idx: Int): List[DocToken.Reference] =
+      parse(b, DocToken.referenceParser(_), startIndex = idx) match {
+        case Parsed.Success(value, index) => List(DocToken.Reference(value)) ++ parseBodyFrom(index)
+        case _ => List[DocToken.Reference]()
       }
-      .getOrElse(Nil)
+
+    parseBodyFrom(0)
+  }.getOrElse(Nil)
 }
 
 /**
@@ -47,13 +40,11 @@ object DocToken {
   /**
    * Parser that for obtaining a class reference from an scaladoc body.
    */
-  private def referenceParser[_: P]: P[String] = P(
+  private def referenceParser[$: P]: P[String] = P(
     // Removes the elements previous to the references.
     ((AnyChar ~ !"[[").rep ~ AnyChar).?
     // Retrieves the element within a
-      ~ "[[" ~
-      ((AnyChar ~ !"]]").rep ~ AnyChar).!
-      ~ "]]"
+    ~ "[[" ~ ((AnyChar ~ !"]]").rep ~ AnyChar).! ~ "]]"
   )
 
   /**
@@ -67,29 +58,28 @@ object DocToken {
   /**
    * Returns all the labelled token kinds.
    */
-  val tagTokenKinds: List[TagKind] =
-    List(
-      Constructor,
-      Param,
-      TypeParam,
-      Return,
-      Throws,
-      See,
-      Note,
-      Example,
-      UseCase,
-      Author,
-      Version,
-      Since,
-      Todo,
-      Deprecated,
-      Migration,
-      Group,
-      GroupName,
-      GroupDescription,
-      GroupPriority,
-      Documentable
-    )
+  val tagTokenKinds: List[TagKind] = List(
+    Constructor,
+    Param,
+    TypeParam,
+    Return,
+    Throws,
+    See,
+    Note,
+    Example,
+    UseCase,
+    Author,
+    Version,
+    Since,
+    Todo,
+    Deprecated,
+    Migration,
+    Group,
+    GroupName,
+    GroupDescription,
+    GroupPriority,
+    Documentable
+  )
 
   /**
    * Represents a documentation remark.
@@ -121,8 +111,7 @@ object DocToken {
    * Companion object for [[TagKind]] containing its pattern match extractor.
    */
   object TagKind {
-    def unapply(kind: TagKind): Option[(String, Int)] =
-      Option(kind.label, kind.numberParameters)
+    def unapply(kind: TagKind): Option[(String, Int)] = Option(kind.label, kind.numberParameters)
   }
 
   /**
@@ -143,7 +132,7 @@ object DocToken {
   /**
    * Documents the return value of a method.
    */
-  case object Return extends TagKind("@returns", numberParameters = 1)
+  case object Return extends TagKind("@return", numberParameters = 1)
 
   /**
    * Documents an exception type that may be thrown by a method or class constructor.

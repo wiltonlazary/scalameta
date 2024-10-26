@@ -2,9 +2,10 @@ package scala.meta
 package internal
 package transversers
 
-import scala.reflect.macros.whitebox.Context
 import org.scalameta.internal.MacroHelpers
 import scala.meta.internal.trees.{Reflection => AstReflection}
+
+import scala.reflect.macros.whitebox.Context
 
 trait TransverserMacros extends MacroHelpers with AstReflection {
   lazy val u: c.universe.type = c.universe
@@ -14,7 +15,6 @@ trait TransverserMacros extends MacroHelpers with AstReflection {
 
   lazy val TreeClass = tq"_root_.scala.meta.Tree"
   lazy val TreeAdt = TreeSymbol.asRoot
-  lazy val QuasiClass = tq"_root_.scala.meta.internal.trees.Quasi"
   lazy val QuasiAdt = QuasiSymbol.asAdt
   lazy val Hack1Class = hygienicRef[org.scalameta.overload.Hack1]
   lazy val Hack2Class = hygienicRef[org.scalameta.overload.Hack2]
@@ -29,41 +29,28 @@ trait TransverserMacros extends MacroHelpers with AstReflection {
   def leafHandlerType(): Tree
   def generatedMethods(): Tree
 
-  def impl(annottees: Tree*): Tree =
-    annottees.transformAnnottees(new ImplTransformer {
-      override def transformClass(cdef: ClassDef, mdef: ModuleDef): List[ImplDef] = {
-        val q"$mods class $name[..$tparams] $ctorMods(...$paramss) extends { ..$earlydefns } with ..$parents { $self => ..$stats }" =
-          cdef
+  def impl(annottees: Tree*): Tree = annottees.transformAnnottees(new ImplTransformer {
+    override def transformClass(cdef: ClassDef, mdef: ModuleDef): List[ImplDef] = {
+      val q"$mods class $name[..$tparams] $ctorMods(...$paramss) extends { ..$earlydefns } with ..$parents { $self => ..$stats }" =
+        cdef
 
-        val primaryApply = getPrimaryApply()
-        val generatedMethods = TransverserMacros.this.generatedMethods()
-
-        val cdef1 = q"""
+      val cdef1 = q"""
         $mods class $name[..$tparams] $ctorMods(...$paramss) extends { ..$earlydefns } with ..$parents { $self =>
           ..$stats
-          ..$primaryApply
-          ..$generatedMethods
+          ..${getPrimaryApply()}
+          ..${generatedMethods()}
         }
       """
-        List(cdef1, mdef)
-      }
-    })
+      List(cdef1, mdef)
+    }
+  })
 
-  private def getSecondaryApply(prefix: String, leaves: List[Leaf])(
-      priority: String*
-  ): Tree = {
+  private def getSecondaryApply(prefix: String, leaves: List[Leaf])(priority: String*): Tree = {
     val treeName = TermName("_tree")
-    val cases = leaves
-      .sortBy { l =>
-        val idx = priority.indexOf(l.prefix)
-        if (idx != -1) idx else priority.length
-      }
-      .map { l =>
-        val extractor = hygienicRef(l.sym.companion)
-        val binders = l.fields.map(f => pq"${f.name}")
-        val handler = leafHandler(l, treeName)
-        cq"$treeName @ $extractor(..$binders) => $handler"
-      }
+    val cases = leaves.sortBy { l =>
+      val idx = priority.indexOf(l.prefix)
+      if (idx != -1) idx else priority.length
+    }.map(l => cq"$treeName: ${hygienicRef(l.sym)} => ${leafHandler(l, treeName)}")
     val methodName = TermName(s"apply$prefix")
 
     q"""
@@ -79,10 +66,11 @@ trait TransverserMacros extends MacroHelpers with AstReflection {
     val defnBuilder = List.newBuilder[Leaf]
     val restBuilder = List.newBuilder[Leaf]
     TreeAdt.allLeafs.foreach { l =>
-      if (l <:< TermAdt) termBuilder += l
+      if (l <:< QuasiAdt) {} // do nothing
+      else if (l <:< TermAdt) termBuilder += l
       else if (l <:< TypeAdt) typeBuilder += l
       else if (l <:< DefnAdt) defnBuilder += l
-      else if (!(l <:< QuasiAdt)) restBuilder += l
+      else restBuilder += l
     }
 
     val termPriority = Seq("Term.Name", "Term.Apply", "Lit", "Term.Param", "Term.ApplyInfix")

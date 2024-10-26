@@ -2,159 +2,144 @@ package scala.meta.tests
 package parsers
 
 import scala.meta._
-import scala.meta.dialects.Scala211
 
 class DeclSuite extends ParseSuite {
+
+  implicit val dialect: Dialect = dialects.Scala211
+
   test("val x: Int") {
-    val Decl.Val(Nil, List(Pat.Var(Term.Name("x"))), Type.Name("Int")) = templStat("val x: Int")
+    assertTree(templStat("val x: Int"))(Decl.Val(Nil, List(Pat.Var(tname("x"))), pname("Int")))
   }
 
   test("var x: Int") {
-    val Decl.Var(Nil, List(Pat.Var(Term.Name("x"))), Type.Name("Int")) = templStat("var x: Int")
+    assertTree(templStat("var x: Int"))(Decl.Var(Nil, List(Pat.Var(tname("x"))), pname("Int")))
   }
 
   test("val x, y: Int") {
-    val Decl.Val(Nil, List(Pat.Var(Term.Name("x")), Pat.Var(Term.Name("y"))), Type.Name("Int")) =
-      templStat("val x, y: Int")
-    val Decl.Var(Nil, List(Pat.Var(Term.Name("x")), Pat.Var(Term.Name("y"))), Type.Name("Int")) =
-      templStat("var x, y: Int")
+    assertTree(templStat("val x, y: Int"))(
+      Decl.Val(Nil, List(Pat.Var(tname("x")), Pat.Var(tname("y"))), pname("Int"))
+    )
+    assertTree(templStat("var x, y: Int"))(
+      Decl.Var(Nil, List(Pat.Var(tname("x")), Pat.Var(tname("y"))), pname("Int"))
+    )
   }
 
   test("var x, y: Int") {
-    val Decl.Var(Nil, List(Pat.Var(Term.Name("x")), Pat.Var(Term.Name("y"))), Type.Name("Int")) =
-      templStat("var x, y: Int")
+    assertTree(templStat("var x, y: Int"))(
+      Decl.Var(Nil, List(Pat.Var(tname("x")), Pat.Var(tname("y"))), pname("Int"))
+    )
   }
 
   test("type T") {
-    val t @ Decl.Type(Nil, Type.Name("T"), Nil, Type.Bounds(None, None)) = templStat("type T")
+    assertTree(templStat("type T")) {
+      Decl.Type(Nil, pname("T"), Type.ParamClause(Nil), Type.Bounds(None, None))
+    }
   }
 
   test("type T <: hi") {
-    val t @ Decl.Type(Nil, Type.Name("T"), Nil, Type.Bounds(None, Some(Type.Name("hi")))) =
-      templStat("type T <: hi")
+    assertTree(templStat("type T <: hi")) {
+      Decl.Type(Nil, pname("T"), Type.ParamClause(Nil), hiBound("hi"))
+    }
   }
 
   test("type T >: lo") {
-    val t @ Decl.Type(Nil, Type.Name("T"), Nil, Type.Bounds(Some(Type.Name("lo")), None)) =
-      templStat("type T >: lo")
+    assertTree(templStat("type T >: lo")) {
+      Decl.Type(Nil, pname("T"), Type.ParamClause(Nil), loBound("lo"))
+    }
   }
 
   test("type T >: lo <: hi") {
-    val t @ Decl.Type(
-      Nil,
-      Type.Name("T"),
-      Nil,
-      Type.Bounds(Some(Type.Name("lo")), Some(Type.Name("hi")))
-    ) = templStat("type T >: lo <: hi")
+    assertTree(templStat("type T >: lo <: hi")) {
+      Decl.Type(Nil, pname("T"), Type.ParamClause(Nil), bounds("lo", "hi"))
+    }
   }
 
   test("type F[T]") {
-    val Decl.Type(
-      Nil,
-      Type.Name("F"),
-      Type.Param(Nil, Type.Name("T"), Nil, Type.Bounds(None, None), Nil, Nil) :: Nil,
-      Type.Bounds(None, None)
-    ) = templStat("type F[T]")
+    assertTree(templStat("type F[T]"))(Decl.Type(Nil, pname("F"), pparam("T") :: Nil, noBounds))
   }
 
   test("type F[_]") {
-    val Decl.Type(
-      Nil,
-      Type.Name("F"),
-      Type.Param(Nil, Name.Anonymous(), Nil, Type.Bounds(None, None), Nil, Nil) :: Nil,
-      Type.Bounds(None, None)
-    ) = templStat("type F[_]")
+    assertTree(templStat("type F[_]"))(Decl.Type(Nil, pname("F"), pparam("_") :: Nil, noBounds))
   }
 
   test("type F[A <: B]") {
-    val Decl.Type(
-      Nil,
-      Type.Name("F"),
-      Type.Param(Nil, Type.Name("T"), Nil, Type.Bounds(None, Some(Type.Name("B"))), Nil, Nil)
-        :: Nil,
-      Type.Bounds(None, None)
-    ) = templStat("type F[T <: B]")
+    assertTree(templStat("type F[T <: B]")) {
+      Decl.Type(Nil, pname("F"), pparam("T", hiBound("B")) :: Nil, noBounds)
+    }
   }
 
   test("type F[+T]") {
-    val Decl.Type(
-      Nil,
-      Type.Name("F"),
-      Type.Param(Mod.Covariant() :: Nil, Type.Name("T"), Nil, Type.Bounds(None, None), Nil, Nil)
-        :: Nil,
-      Type.Bounds(None, None)
-    ) = templStat("type F[+T]")
-    val Decl.Type(
-      Nil,
-      Type.Name("F"),
-      Type.Param(Mod.Contravariant() :: Nil, Type.Name("T"), Nil, Type.Bounds(None, None), Nil, Nil)
-        :: Nil,
-      Type.Bounds(None, None)
-    ) = templStat("type F[-T]")
+    assertTree(templStat("type F[+T]")) {
+      Decl.Type(Nil, pname("F"), pparam(Mod.Covariant() :: Nil, "T") :: Nil, noBounds)
+    }
+    assertTree(templStat("type F[-T]")) {
+      Decl.Type(Nil, pname("F"), pparam(Mod.Contravariant() :: Nil, "T") :: Nil, noBounds)
+    }
   }
 
   test("def f") {
-    val Decl.Def(Nil, Term.Name("f"), Nil, Nil, Type.Name("Unit")) = templStat("def f")
+    assertTree(templStat("def f")) {
+      Decl.Def(Nil, tname("f"), Type.ParamClause(Nil), Nil, pname("Unit"))
+    }
   }
 
   test("def f(x: Int)") {
-    val Decl.Def(
-      Nil,
-      Term.Name("f"),
-      Nil,
-      (Term.Param(Nil, Term.Name("x"), Some(Type.Name("Int")), None) :: Nil) :: Nil,
-      Type.Name("Unit")
-    ) =
-      templStat("def f(x: Int)")
+    assertTree(templStat("def f(x: Int)")) {
+      Decl.Def(
+        Nil,
+        tname("f"),
+        Type.ParamClause(Nil),
+        (tparam("x", "Int") :: Nil) :: Nil,
+        pname("Unit")
+      )
+    }
   }
 
   test("def f(x: Int*)") {
-    val Decl.Def(
-      Nil,
-      Term.Name("f"),
-      Nil,
-      (Term.Param(Nil, Term.Name("x"), Some(Type.Repeated(Type.Name("Int"))), None) :: Nil) :: Nil,
-      Type.Name("Unit")
-    ) =
-      templStat("def f(x: Int*)")
+    assertTree(templStat("def f(x: Int*)")) {
+      Decl.Def(
+        Nil,
+        tname("f"),
+        Type.ParamClause(Nil),
+        (tparam("x", Type.Repeated(pname("Int"))) :: Nil) :: Nil,
+        pname("Unit")
+      )
+    }
   }
 
   test("def f(x: => Int)") {
-    val Decl.Def(
-      Nil,
-      Term.Name("f"),
-      Nil,
-      (Term.Param(Nil, Term.Name("x"), Some(Type.ByName(Type.Name("Int"))), None) :: Nil) :: Nil,
-      Type.Name("Unit")
-    ) =
-      templStat("def f(x: => Int)")
+    assertTree(templStat("def f(x: => Int)")) {
+      Decl.Def(
+        Nil,
+        tname("f"),
+        Type.ParamClause(Nil),
+        (tparam("x", Type.ByName(pname("Int"))) :: Nil) :: Nil,
+        pname("Unit")
+      )
+    }
   }
 
   test("def f(implicit x: Int)") {
-    val Decl.Def(
-      Nil,
-      Term.Name("f"),
-      Nil,
-      (Term.Param(Mod.Implicit() :: Nil, Term.Name("x"), Some(Type.Name("Int")), None) :: Nil)
-        :: Nil,
-      Type.Name("Unit")
-    ) =
-      templStat("def f(implicit x: Int)")
+    assertTree(templStat("def f(implicit x: Int)")) {
+      Decl.Def(
+        Nil,
+        tname("f"),
+        Nil,
+        (tparam(Mod.Implicit() :: Nil, "x", "Int") :: Nil) :: Nil,
+        pname("Unit")
+      )
+    }
   }
 
   test("def f: X") {
-    val Decl.Def(Nil, Term.Name("f"), Nil, Nil, Type.Name("X")) =
-      templStat("def f: X")
+    assertTree(templStat("def f: X")) {
+      Decl.Def(Nil, tname("f"), Type.ParamClause(Nil), Nil, pname("X"))
+    }
   }
 
   test("def f[T]: T") {
-    val Decl.Def(
-      Nil,
-      Term.Name("f"),
-      Type.Param(Nil, Type.Name("T"), Nil, Type.Bounds(None, None), Nil, Nil) :: Nil,
-      Nil,
-      Type.Name("T")
-    ) =
-      templStat("def f[T]: T")
+    assertTree(templStat("def f[T]: T")) {
+      Decl.Def(Nil, tname("f"), pparam("T") :: Nil, Nil, pname("T"))
+    }
   }
 }

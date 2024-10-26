@@ -1,6 +1,5 @@
 package scala.meta.tests.metacp
 
-import munit.FunSuite
 import scala.meta.internal.classpath.ClasspathIndex
 import scala.meta.internal.io.PathIO
 import scala.meta.io.AbsolutePath
@@ -8,9 +7,12 @@ import scala.meta.io.Classpath
 import scala.meta.tests.BuildInfo
 import scala.meta.tests.semanticdb.ManifestMetacp
 
+import java.nio.file.Paths
+
+import munit.FunSuite
+
 class ClasspathIndexSuite extends FunSuite {
-  def classpath(path: AbsolutePath) =
-    Classpath(path :: Library.scalaLibrary.classpath().entries)
+  def classpath(path: AbsolutePath) = Classpath(path :: Library.scalaLibrary.classpath().entries)
 
   test("manifest") {
     val jar = AbsolutePath(ManifestMetacp.path.getParent.resolve("manifest.jar"))
@@ -51,4 +53,8 @@ class ClasspathIndexSuite extends FunSuite {
     val index = ClasspathIndex(classpath)
   }
 
+  test("ignore classpath entry for files that are not jar/zip") {
+    val classpath = Classpath(Paths.get(getClass().getResource("/unicode.txt").toURI()))
+    val index = ClasspathIndex(classpath)
+  }
 }

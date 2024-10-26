@@ -1,14 +1,12 @@
 package scala.meta.testkit
 
 import java.io.File
+import java.net.URI
 import java.net.URL
 
-import geny.Generator
+import org.rauschig.jarchivelib.ArchiverFactory
 
 import sys.process._
-import java.net.URL
-import java.io.File
-import org.rauschig.jarchivelib.ArchiverFactory
 
 /**
  * A collection of Scala source files to run [[SyntaxAnalysis]].
@@ -86,26 +84,20 @@ object Corpus {
     val localDirectory = FileOps.getFile("target", name)
     if (!localDirectory.isDirectory) {
       val localTarball = FileOps.getFile(s"$name.tar.gz")
-      if (!localTarball.isFile) {
-        downloadReposTar(corpus, destination = localTarball)
-      }
+      if (!localTarball.isFile) downloadReposTar(corpus, destination = localTarball)
       extractReposTar(localTarball, destination = FileOps.workingDirectory)
     }
     FileOps.getFile("target", name)
   }
 
-  private def extractReposTar(tarball: File, destination: File): Unit = {
-    Phase.run(s"extract $tarball") {
+  private def extractReposTar(tarball: File, destination: File): Unit = Phase
+    .run(s"extract $tarball") {
       val archiver = ArchiverFactory.createArchiver("tar", "gz")
       archiver.extract(tarball, destination)
     }
-  }
 
-  private def downloadReposTar(corpus: Corpus, destination: File): Unit = {
-    Phase.run(s"download ${corpus.url}") {
-      new URL(corpus.url).#>(destination).!!
-    }
-  }
+  private def downloadReposTar(corpus: Corpus, destination: File): Unit = Phase
+    .run(s"download ${corpus.url}")(new URI(corpus.url).toURL.#>(destination).!!)
 
   /**
    * Downloads the zip file, extracts it and parses into a list of [[CorpusFile]].
@@ -113,24 +105,21 @@ object Corpus {
    * @param corpus
    *   See [[Corpus]].
    * @return
-   *   A generator of [[CorpusFile]]. Use Generator.take to limit the size of your experiment and
+   *   An iterator of [[CorpusFile]]. Use Iterator.take to limit the size of your experiment and
    *   Generator.toBuffer.par to run analysis using all available cores on the machine.
    */
-  def files(corpus: Corpus): Generator[CorpusFile] = {
+  def files(corpus: Corpus): Iterator[CorpusFile] = {
     val repos = createReposDir(corpus)
     val files = Option(repos.listFiles()).getOrElse {
       throw new IllegalStateException(
         s"${repos.getAbsolutePath} is not a directory! Please delete if it's a file and retry."
       )
     }
-    Generator.from(files.toList).flatMap { repo =>
+    files.iterator.flatMap { repo =>
       val commit = FileOps.readFile(new File(repo, "COMMIT")).trim
       val url = FileOps.readFile(new File(repo, "URL")).trim
-      FileOps
-        .listFiles(repo)
-        .filter(sourceFile => sourceFile.endsWith(".scala"))
-        .filter(corpus.filter)
-        .map { sourceFile =>
+      FileOps.listFiles(repo).filter(sourceFile => sourceFile.endsWith(".scala"))
+        .filter(corpus.filter).map { sourceFile =>
           val filename = sourceFile.stripPrefix(repo.getPath)
           CorpusFile(filename.trim, url, commit)
         }

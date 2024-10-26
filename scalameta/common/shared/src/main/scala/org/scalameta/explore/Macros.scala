@@ -1,9 +1,10 @@
 package org.scalameta
 package explore
 
-import scala.reflect.macros.whitebox.Context
 import org.scalameta.internal.MacroHelpers
+
 import scala.collection.mutable.Set
+import scala.reflect.macros.whitebox.Context
 
 class ExploreMacros(val c: Context) extends MacroHelpers {
   import c.universe._
@@ -25,27 +26,20 @@ class ExploreMacros(val c: Context) extends MacroHelpers {
       }
       def aliases = sym.fullName.contains(".Aliases.")
       def contrib = sym.fullName.contains(".contrib.") || sym.fullName.endsWith(".contrib")
-      def interactive =
-        sym.fullName.contains(".interactive.") || sym.fullName.endsWith(".interactive")
+      def interactive = sym.fullName.contains(".interactive.") ||
+        sym.fullName.endsWith(".interactive")
       def testkit = sym.fullName.contains(".testkit.") || sym.fullName.endsWith(".testkit")
       def tests = sym.fullName.contains(".tests.") || sym.fullName.endsWith(".tests")
-      def internal =
-        sym.fullName.contains(".internal.") || (sym.fullName.endsWith(".internal") && !sym.fullName
-          .endsWith(".meta.internal"))
+      def internal = sym.fullName.contains(".internal.") ||
+        (sym.fullName.endsWith(".internal") && !sym.fullName.endsWith(".meta.internal"))
       def invisible = !sym.isPublic
-      def inexistent =
-        !sym.asInstanceOf[scala.reflect.internal.SymbolTable#Symbol].exists // NOTE: wtf
-      artefact || trivial || arbitrary || aliases || contrib || interactive || testkit || tests || internal || invisible || inexistent
+      def inexistent = !sym.asInstanceOf[scala.reflect.internal.SymbolTable#Symbol].exists // NOTE: wtf
+      artefact || trivial || arbitrary || aliases || contrib || interactive || testkit || tests ||
+      internal || invisible || inexistent
     }
-    def isRelevant: Boolean = {
-      !isIrrelevant
-    }
-    def isPkgObject: Boolean = {
-      sym.owner.isPackage && sym.isModule && sym.name == termNames.PACKAGE
-    }
-    def isImplicitClass: Boolean = {
-      sym.isClass && sym.isImplicit
-    }
+    def isRelevant: Boolean = !isIrrelevant
+    def isPkgObject: Boolean = sym.owner.isPackage && sym.isModule && sym.name == termNames.PACKAGE
+    def isImplicitClass: Boolean = sym.isClass && sym.isImplicit
     def signatureIn(owner: Symbol): String = {
       def paramss(m: Symbol, wrapFirst: Boolean): String = {
         val pss = m.asMethod.paramLists
@@ -58,22 +52,17 @@ class ExploreMacros(val c: Context) extends MacroHelpers {
         }
         s_ps.mkString("")
       }
-      val prefix = {
+      val prefix =
         if (sym.owner.isImplicit) {
           val ctor = sym.owner.info.members
-            .find(sym => sym.isMethod && sym.asMethod.isPrimaryConstructor)
-            .get
+            .find(sym => sym.isMethod && sym.asMethod.isPrimaryConstructor).get
           "* " + paramss(ctor, wrapFirst = false)
-        } else {
-          scala.reflect.NameTransformer.decode(owner.fullName)
-        }
-      }
+        } else scala.reflect.NameTransformer.decode(owner.fullName)
       val main = sym.name.decodedName.toString
-      val suffix = {
-        if (sym.isConstructor || sym.isMacro || sym.isMethod)
-          paramss(sym, wrapFirst = true) + ": " + sym.info.finalResultType
+      val suffix =
+        if (sym.isConstructor || sym.isMacro || sym.isMethod) paramss(sym, wrapFirst = true) +
+          ": " + sym.info.finalResultType
         else ""
-      }
       prefix + "." + main + suffix
     }
   }
@@ -90,56 +79,46 @@ class ExploreMacros(val c: Context) extends MacroHelpers {
         if (interesting) visited += sym
         interesting
       }
-      def markAndRecur(sym: Symbol): Unit = {
-        if (mark(sym)) loop(sym)
-      }
+      def markAndRecur(sym: Symbol): Unit = if (mark(sym)) loop(sym)
 
       if (parent == NoSymbol) return
-      parent.info.members.toList.foreach(sym => {
-        def failUnsupported(sym: Symbol): Nothing = {
-          c.abort(c.enclosingPosition, s"unsupported symbol $sym: ${sym.fullName}")
-        }
+      parent.info.members.toList.foreach { sym =>
+        def failUnsupported(sym: Symbol): Nothing = c
+          .abort(c.enclosingPosition, s"unsupported symbol $sym: ${sym.fullName}")
         if (sym.name.decodedName.toString.contains("$")) {
           // ignore: not worth processing
-        } else {
-          if (sym.isPackage) {
-            if (!onlyImmediatelyAccessible) markAndRecur(sym)
-            visited += sym
-          } else if (sym.isModule) {
-            // don't check onlyImmediatelyAccessible
-            // because we expect many members of modules to be used via full fullNames
-            markAndRecur(sym)
-          } else if (sym.isClass) {
-            // don't recur into class members
-            mark(sym)
-          } else if (sym.isMethod) {
-            if (sym.asMethod.isGetter) {
-              val isInPackageClass = sym.owner.isModuleClass && sym.owner.name == typeNames.PACKAGE
-              if (isInPackageClass) {
-                // doesn't make sense to recur into package class methods
-                mark(sym)
-              } else {
-                // handle term aliases
-                val target = sym.info.finalResultType.typeSymbol
-                if (target.isModuleClass) loop(target.asClass.module)
-                else ()
-              }
+        } else if (sym.isPackage) {
+          if (!onlyImmediatelyAccessible) markAndRecur(sym)
+          visited += sym
+        } else if (sym.isModule)
+          // don't check onlyImmediatelyAccessible
+          // because we expect many members of modules to be used via full fullNames
+          markAndRecur(sym)
+        else if (sym.isClass)
+          // don't recur into class members
+          mark(sym)
+        else if (sym.isMethod) {
+          if (sym.asMethod.isGetter) {
+            val isInPackageClass = sym.owner.isModuleClass && sym.owner.name == typeNames.PACKAGE
+            if (isInPackageClass)
+              // doesn't make sense to recur into package class methods
+              mark(sym)
+            else {
+              // handle term aliases
+              val target = sym.info.finalResultType.typeSymbol
+              if (target.isModuleClass) loop(target.asClass.module) else ()
             }
-          } else if (sym.isType) {
-            // handle type aliases
-            // doesn't make sense to recur into type aliases
-            mark(sym.info.typeSymbol)
-          } else if (sym.isTerm) {
-            if (sym.asTerm.getter != NoSymbol || sym.isPrivateThis) {
-              // ignore: processed in sym.isMethod
-            } else {
-              failUnsupported(sym)
-            }
-          } else {
-            failUnsupported(sym)
           }
-        }
-      })
+        } else if (sym.isType)
+          // handle type aliases
+          // doesn't make sense to recur into type aliases
+          mark(sym.info.typeSymbol)
+        else if (sym.isTerm)
+          if (sym.asTerm.getter != NoSymbol || sym.isPrivateThis) {
+            // ignore: processed in sym.isMethod
+          } else failUnsupported(sym)
+        else failUnsupported(sym)
+      }
     }
 
     assert(pkg.isPackage)
@@ -157,12 +136,11 @@ class ExploreMacros(val c: Context) extends MacroHelpers {
       staticClassesObjectsAndVals(m.staticPackage(s_packageName), onlyImmediatelyAccessible)
     val nonImplicitClassStatics = statics.filter(!_.isImplicitClass)
     val (pkgObjects, nonPkgObjectStatics) = nonImplicitClassStatics.partition(_.isPkgObject)
-    val allowedPkgObjects =
-      pkgObjects.filter(sym => sym.owner.fullName == s_packageName || !onlyImmediatelyAccessible)
+    val allowedPkgObjects = pkgObjects
+      .filter(sym => sym.owner.fullName == s_packageName || !onlyImmediatelyAccessible)
     val pkgObjectMethods = allowedPkgObjects.flatMap(_.info.members.toList.collect {
       case sym: MethodSymbol
-          if !sym.isAccessor && !sym.isImplicit && !sym.isConstructor && sym.isRelevant =>
-        sym
+          if !sym.isAccessor && !sym.isImplicit && !sym.isConstructor && sym.isRelevant => sym
     })
 
     // NOTE: We filtered out package objects and implicit classes (hopefully, IDEs and autocompletes will ignore those),
@@ -172,13 +150,11 @@ class ExploreMacros(val c: Context) extends MacroHelpers {
     q"${fullNames.distinct.sorted}"
   }
 
-  def wildcardImportStaticsImpl(packageName: Tree): Tree = {
+  def wildcardImportStaticsImpl(packageName: Tree): Tree =
     staticsImpl(packageName, onlyImmediatelyAccessible = true)
-  }
 
-  def allStaticsImpl(packageName: Tree): Tree = {
+  def allStaticsImpl(packageName: Tree): Tree =
     staticsImpl(packageName, onlyImmediatelyAccessible = false)
-  }
 
   def extensionSurfaceImpl(packageName: Tree): Tree = {
     val Literal(Constant(s_packageName: String)) = packageName
@@ -187,17 +163,14 @@ class ExploreMacros(val c: Context) extends MacroHelpers {
 
     val extensionSurface = {
       val implicitClasses = statics.filter(_.isImplicitClass)
-      val result = implicitClasses.flatMap(cls => {
-        val extensionMethods = cls.info.decls.collect {
-          case sym if sym.isMethod && !sym.isConstructor => sym.asMethod
-        }
+      val result = implicitClasses.flatMap { cls =>
+        val extensionMethods = cls.info.decls
+          .collect { case sym if sym.isMethod && !sym.isConstructor => sym.asMethod }
         extensionMethods.filter(_.isRelevant)
-      })
+      }
       result.map(sym => (NoSymbol, sym))
     }
-    val s_surface = extensionSurface.collect { case (owner, sym) =>
-      sym.signatureIn(owner)
-    }
+    val s_surface = extensionSurface.collect { case (owner, sym) => sym.signatureIn(owner) }
     q"${s_surface.distinct.sorted}"
   }
 }

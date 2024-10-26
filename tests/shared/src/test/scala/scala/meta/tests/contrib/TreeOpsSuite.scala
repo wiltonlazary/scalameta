@@ -1,38 +1,48 @@
 package scala.meta.tests
 package contrib
 
-import munit.FunSuite
 import scala.meta._
 import scala.meta.contrib._
 
-class TreeOpsSuite extends FunSuite {
+import scala.collection.mutable.ListBuffer
+
+import munit.FunSuite
+
+class TreeOpsSuite extends TreeSuiteBase {
   val a: Defn.Val = q"val x = 2"
 
   test("testForeach") {
-    var obtained = List.empty[String]
-    a.foreach(x => obtained = x.structure :: obtained)
-    assert(
-      obtained ==
-        List(
-          "Lit.Int(2)",
-          "Term.Name(\"x\")",
-          "Pat.Var(Term.Name(\"x\"))",
-          "Defn.Val(Nil, List(Pat.Var(Term.Name(\"x\"))), None, Lit.Int(2))"
-        )
+    val obtained = new ListBuffer[String]
+    a.foreach(x => obtained.append(x.structure))
+    assertEquals(
+      obtained.result(),
+      List(
+        """|Defn.Val(
+           |  Nil,
+           |  List(
+           |    Pat.Var(Term.Name("x"))
+           |  ),
+           |  None,
+           |  Lit.Int(2)
+           |)""".stripMargin.lf2nl,
+        """Pat.Var(Term.Name("x"))""",
+        """Term.Name("x")""",
+        """Lit.Int(2)"""
+      )
     )
   }
 
   test("ancestors") {
     val lit: Tree = q"val x = { 2 + 3 }".find(_.isEqual(q"3")).get
-    assert(lit.ancestors.length == 3)
+    assertEquals(lit.ancestors.length, 4)
     assert(q"val x = { 2 + 3 }".ancestors.isEmpty)
   }
 
   test("descendants") {
-    assert(a.descendants.length == 3)
-    assert(q"3".descendants.isEmpty)
+    assertEquals(a.descendants.length, 3)
+    assertEquals(q"3".descendants.length, 0)
     val tree: Defn.Val = q"val x = { 2 + 3 }"
-    assert(tree.descendants.size == 7)
+    assertEquals(tree.descendants.size, 9)
   }
 
   test("forall") {

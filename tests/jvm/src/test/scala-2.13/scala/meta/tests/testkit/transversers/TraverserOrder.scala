@@ -1,13 +1,15 @@
 package scala.meta.tests.testkit
 package transversers
 
-import munit.FunSuite
-
-import scala.collection.mutable
 import scala.meta.Tree
 import scala.meta.testkit.SyntaxAnalysis
 import scala.meta.tests.testkit.contrib.ContribSuite
-import scala.meta.transversers.{SimpleTraverser, Traverser}
+import scala.meta.transversers.SimpleTraverser
+import scala.meta.transversers.Traverser
+
+import scala.collection.mutable
+
+import munit.FunSuite
 
 class TraverserOrder extends FunSuite {
 
@@ -18,17 +20,14 @@ class TraverserOrder extends FunSuite {
    * fields to real ones or just drop the traverser API.
    * https://github.com/scalameta/scalameta/issues/2247
    */
-  test("traversal order is preserved".ignore) {
+  test("traversal order is preserved") {
     val errors = SyntaxAnalysis.onParsed[Tree](ContribSuite.corpus) { ast =>
       val trees1 = asList_Traverser(ast)
       val trees2 = asList_SimpleTraverser(ast)
 
       if (trees1.size != trees2.size) List(ast)
       else {
-        val firstDiff =
-          trees1
-            .zip(trees2)
-            .collectFirst { case (a, b) if a != b => a }
+        val firstDiff = trees1.zip(trees2).collectFirst { case (a, b) if a != b => a }
         firstDiff.toList
       }
     }

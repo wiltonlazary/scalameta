@@ -5,17 +5,11 @@ private[parsers] trait NestedContext {
   private var nested = 0
   def within[T](body: => T): T = {
     nested += 1
-    try {
-      body
-    } finally {
-      nested -= 1
-    }
+    try body
+    finally nested -= 1
   }
-  def isInside() = nested > 0
+  @inline
+  def isInside() = isDeeper(0)
+  @inline
+  def isDeeper(level: Int) = nested > level
 }
-
-private[parsers] object QuotedSpliceContext extends NestedContext
-
-private[parsers] object QuotedPatternContext extends NestedContext
-
-private[parsers] object ReturnTypeContext extends NestedContext

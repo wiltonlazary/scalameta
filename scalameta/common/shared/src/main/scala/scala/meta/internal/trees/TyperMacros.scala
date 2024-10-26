@@ -2,10 +2,11 @@ package scala.meta
 package internal
 package trees
 
-import scala.language.experimental.macros
-import scala.reflect.macros.blackbox.Context
 import org.scalameta.adt.{Reflection => AdtReflection}
 import org.scalameta.internal.MacroHelpers
+
+import scala.language.experimental.macros
+import scala.reflect.macros.blackbox.Context
 
 // Parts of @root, @branch and @ast logic that need a typer context and can't be run in a macro annotation.
 object CommonTyperMacros {
@@ -24,52 +25,17 @@ class CommonTyperMacrosBundle(val c: Context) extends AdtReflection with MacroHe
   import c.universe._
 
   def hierarchyCheck[T](implicit T: c.WeakTypeTag[T]): c.Tree = {
-    val sym = T.tpe.typeSymbol.asClass
-    val designation =
-      if (sym.isRoot) "root"
-      else if (sym.isBranch) "branch"
-      else if (sym.isLeaf) "leaf"
-      else "unknown"
-    val roots = sym.baseClasses.filter(_.isRoot)
-    if (roots.length == 0 && sym.isLeaf)
-      c.abort(c.enclosingPosition, s"rootless leaf is disallowed")
-    else if (roots.length > 1)
-      c.abort(
-        c.enclosingPosition,
-        s"multiple roots for a $designation: " + (roots
-          .map(_.fullName)
-          .init
-          .mkString(", ")) + " and " + roots.last.fullName
-      )
-    val root = roots.headOption.getOrElse(NoSymbol)
-    sym.baseClasses.map(_.asClass).foreach { bsym =>
-      val exempt =
-        bsym.isModuleClass ||
-          bsym == symbolOf[Object] ||
-          bsym == symbolOf[Any] ||
-          bsym == symbolOf[scala.Serializable] ||
-          bsym == symbolOf[java.io.Serializable] ||
-          bsym == symbolOf[scala.Product] ||
-          bsym == symbolOf[scala.Equals] ||
-          root.info.baseClasses.contains(bsym)
-      if (!exempt && !bsym.isRoot && !bsym.isBranch && !bsym.isLeaf)
-        c.abort(c.enclosingPosition, s"outsider parent of a $designation: ${bsym.fullName}")
     // NOTE: sealedness is turned off because we can't have @ast hierarchy sealed anymore
     // hopefully, in the future we'll find a way to restore sealedness
-    // if (!exempt && !bsym.isSealed && !bsym.isFinal) c.abort(c.enclosingPosition, s"unsealed parent of a $designation: ${bsym.fullName}")
-    }
+    checkHierarchy(T.tpe, c.abort(c.enclosingPosition, _), checkSealed = false)
     q"()"
   }
 
   def interfaceToApi[I, A](
       interface: c.Tree
-  )(implicit I: c.WeakTypeTag[I], A: c.WeakTypeTag[A]): c.Tree = {
-    q"$interface.asInstanceOf[$A]"
-  }
+  )(implicit I: c.WeakTypeTag[I], A: c.WeakTypeTag[A]): c.Tree = q"$interface.asInstanceOf[$A]"
 
-  def productPrefix[T](implicit T: c.WeakTypeTag[T]): c.Tree = {
-    q"${T.tpe.typeSymbol.asLeaf.prefix}"
-  }
+  def productPrefix[T](implicit T: c.WeakTypeTag[T]): c.Tree = q"${T.tpe.typeSymbol.asLeaf.prefix}"
 
   def loadField(f: c.Tree, s: c.Tree): c.Tree = {
     val q"this.$finternalName" = f
@@ -106,9 +72,8 @@ class CommonTyperMacrosBundle(val c: Context) extends AdtReflection with MacroHe
   }
 
   def storeField(f: c.Tree, v: c.Tree, s: c.Tree): c.Tree = {
-    def copySubtree(subtree: c.Tree, subtp: c.Type) = {
+    def copySubtree(subtree: c.Tree, subtp: c.Type) =
       q"$subtree.privateCopy(prototype = $subtree, parent = node, destination = $s).asInstanceOf[$subtp]"
-    }
     f.tpe.finalResultType match {
       case AnyTpe() => q"()"
       case PrimitiveTpe() => q"()"
@@ -120,17 +85,15 @@ class CommonTyperMacrosBundle(val c: Context) extends AdtReflection with MacroHe
       case tpe => c.abort(c.enclosingPosition, s"unsupported field type $tpe")
     }
   }
-  def initField(f: c.Tree): c.Tree = {
-    f.tpe.finalResultType match {
-      case AnyTpe() => q"$f"
-      case PrimitiveTpe() => q"$f"
-      case TreeTpe() => q"null"
-      case OptionTreeTpe(tpe) => q"null"
-      case ListTreeTpe(tpe) => q"null"
-      case OptionListTreeTpe(tpe) => q"null"
-      case ListListTreeTpe(tpe) => q"null"
-      case tpe => c.abort(c.enclosingPosition, s"unsupported field type $tpe")
-    }
+  def initField(f: c.Tree): c.Tree = f.tpe.finalResultType match {
+    case AnyTpe() => q"$f"
+    case PrimitiveTpe() => q"$f"
+    case TreeTpe() => q"null"
+    case OptionTreeTpe(tpe) => q"null"
+    case ListTreeTpe(tpe) => q"null"
+    case OptionListTreeTpe(tpe) => q"null"
+    case ListListTreeTpe(tpe) => q"null"
+    case tpe => c.abort(c.enclosingPosition, s"unsupported field type $tpe")
   }
 
   def children[T](implicit T: c.WeakTypeTag[T]): c.Tree = {
@@ -141,7 +104,7 @@ class CommonTyperMacrosBundle(val c: Context) extends AdtReflection with MacroHe
       result
     }
     val leaf = T.tpe.typeSymbol.asLeaf
-    val allAnalyzedFields = leaf.fields ++ leaf.binaryCompatFields
+    val allAnalyzedFields = leaf.fields
     val acc = allAnalyzedFields.foldLeft(q"": Tree)((acc, f) =>
       f.tpe match {
         case TreeTpe() =>
@@ -159,8 +122,7 @@ class CommonTyperMacrosBundle(val c: Context) extends AdtReflection with MacroHe
         case ListListTreeTpe(_) =>
           val acc1 = flushStreak(acc)
           q"$acc1 ++ this.${f.sym}.flatten"
-        case _ =>
-          acc
+        case _ => acc
       }
     )
     flushStreak(acc)

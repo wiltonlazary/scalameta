@@ -11,22 +11,25 @@ object LegacyToken {
 
   /** special tokens */
   final val EMPTY = -3
-  final val UNDEF = -2
-  final val ERROR = -1
+  final val PASTEOF = -1
   final val EOF = 0
+  final val SHEBANG = 1
+  final val INVALID = 2 // non-negative: we want to continue tokenizing
 
   /** literals */
-  final val CHARLIT = 1
-  final val INTLIT = 2
-  final val LONGLIT = 3
-  final val FLOATLIT = 4
-  final val DOUBLELIT = 5
-  final val STRINGLIT = 6
-  final val STRINGPART = 7 // a part of an interpolated string
-  final val SYMBOLLIT = 8
-  final val INTERPOLATIONID = 9 // the lead identifier of an interpolated string
-  final val XMLLIT = 1000
-  final val XMLLITEND = 1001
+  final val LITERAL_BEG = 1001
+  final val CHARLIT = LITERAL_BEG + 0
+  final val INTLIT = LITERAL_BEG + 1
+  final val LONGLIT = LITERAL_BEG + 2
+  final val FLOATLIT = LITERAL_BEG + 3
+  final val DOUBLELIT = LITERAL_BEG + 4
+  final val STRINGLIT = LITERAL_BEG + 5
+  final val STRINGPART = LITERAL_BEG + 6 // a part of an interpolated string
+  final val SYMBOLLIT = LITERAL_BEG + 7
+  final val INTERPOLATIONID = LITERAL_BEG + 8 // the lead identifier of an interpolated string
+  final val XMLLIT = LITERAL_BEG + 9
+  final val XMLLITEND = LITERAL_BEG + 10
+  final val LITERAL_END = LITERAL_BEG + 11
 
   /** identifiers */
   final val IDENTIFIER = 10
@@ -113,7 +116,15 @@ object LegacyToken {
   final val TYPELAMBDAARROW = 137
   final val CTXARROW = 138
 
-  final val WHITESPACE = 201
+  final val WHITESPACE_BEG = 201
+  final val WHITESPACE_SPC = WHITESPACE_BEG + 0
+  final val WHITESPACE_TAB = WHITESPACE_BEG + 1
+  final val WHITESPACE_LF = WHITESPACE_BEG + 2
+  final val WHITESPACE_FF = WHITESPACE_BEG + 3
+  final val WHITESPACE_CR = WHITESPACE_BEG + 4
+  final val WHITESPACE_CRLF = WHITESPACE_BEG + 5
+  final val WHITESPACE_END = WHITESPACE_BEG + 6
+
   final val COMMENT = 300
 
   final val UNQUOTE = 400

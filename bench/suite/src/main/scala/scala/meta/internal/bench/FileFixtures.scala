@@ -1,15 +1,14 @@
 package scala.meta.internal.bench
 
+import org.scalameta.collections._
+
 import java.nio.file._
-import scala.collection.JavaConverters._
 
 trait FileFixtures {
-  lazy val scalapDir: Path = {
-    Paths.get(s"${BuildInfo.sourceroot}/bench/corpus/scalap")
-  }
+  lazy val scalapDir: Path = Paths.get(s"${BuildInfo.sourceroot}/bench/corpus/scalap")
 
   lazy val scalapFiles: List[Path] = {
-    val all = Files.walk(scalapDir).iterator.asScala.toList
+    val all = Files.walk(scalapDir).iterator.toScala.toList
     all.filter(p => !Files.isDirectory(p))
   }
 }

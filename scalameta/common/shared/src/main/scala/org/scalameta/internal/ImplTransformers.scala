@@ -5,13 +5,12 @@ import scala.reflect.macros.blackbox.Context
 
 trait ImplTransformers {
   val c: Context
+
+  import c.universe.Flag._
   import c.universe._
-  import Flag._
 
   implicit class XtensionAnnotteeTransformer(annottees: Seq[Tree]) {
-    def transformAnnottees(transformer: ImplTransformer): Tree = {
-      transformer.transform(annottees: _*)
-    }
+    def transformAnnottees(transformer: ImplTransformer): Tree = transformer.transform(annottees: _*)
   }
 
   class ImplTransformer {
@@ -21,9 +20,8 @@ trait ImplTransformers {
 
     def transform(annottees: Tree*): Tree = {
       def isImplemented(body: => Any): Boolean =
-        try {
-          body; true
-        } catch { case _: NotImplementedError => false; case _: Throwable => true }
+        try { body; true }
+        catch { case _: NotImplementedError => false; case _: Throwable => true }
       val allowClasses = isImplemented(transformClass(null, null))
       val allowTraits = isImplemented(transformTrait(null, null))
       val allowModules = isImplemented(transformModule(null))
@@ -34,17 +32,16 @@ trait ImplTransformers {
         if (allowClasses) allowed :+= "classes"
         if (allowTraits) allowed :+= "traits"
         if (allowModules) allowed :+= "modules"
-        val s_allowed = {
+        val s_allowed =
           if (allowed.length > 1) allowed.dropRight(1).mkString(", ") + " and " + allowed.last
           else allowed.mkString
-        }
         val q"new $s_name(...$_).macroTransform(..$_)" = c.macroApplication
         c.abort(annottees.head.pos, s"only $s_allowed can be $s_name")
       }
 
       val expanded = annottees match {
         case (cdef @ ClassDef(mods, _, _, _)) :: (mdef: ModuleDef) :: rest =>
-          if (!(mods hasFlag TRAIT)) {
+          if (!mods.hasFlag(TRAIT)) {
             if (!allowClasses) failUexpectedAnnottees()
             transformClass(cdef, mdef) ++ rest
           } else {
@@ -53,7 +50,7 @@ trait ImplTransformers {
           }
         case (cdef @ ClassDef(mods, name, _, _)) :: rest =>
           val syntheticMdef = q"object ${name.toTermName}"
-          if (!(mods hasFlag TRAIT)) {
+          if (!mods.hasFlag(TRAIT)) {
             if (!allowClasses) failUexpectedAnnottees()
             transformClass(cdef, syntheticMdef) ++ rest
           } else {
@@ -63,8 +60,7 @@ trait ImplTransformers {
         case (mdef @ ModuleDef(_, _, _)) :: rest =>
           if (!allowModules) failUexpectedAnnottees()
           transformModule(mdef) +: rest
-        case annottee :: rest =>
-          failUexpectedAnnottees()
+        case annottee :: rest => failUexpectedAnnottees()
       }
       q"{ ..$expanded; () }"
     }

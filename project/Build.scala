@@ -1,13 +1,15 @@
 package org.scalameta
 package build
 
-import java.lang.ProcessBuilder._
-import java.nio.file._
-import java.nio.file.Files._
-import scala.collection.JavaConverters._
-import sbt._
 import sbt.Keys._
+import sbt._
 import sbt.plugins._
+
+import java.lang.ProcessBuilder._
+import java.nio.file.Files._
+import java.nio.file._
+
+import scala.collection.JavaConverters._
 
 object Build extends AutoPlugin {
   override def requires: Plugins = JvmPlugin
@@ -16,28 +18,20 @@ object Build extends AutoPlugin {
   import autoImport._
   object autoImport {
     trait BenchSuite {
-      def initCommands: List[String] = List(
-        "bench/clean",
-        "wow " + Versions.LatestScala212
-      )
+      def initCommands: List[String] = List("bench/clean", "wow " + Versions.LatestScala212)
 
       def metacpBenches: List[String]
-      def metacpCommands: List[String] = {
-        if (metacpBenches.isEmpty) Nil
-        else List("bench/jmh:run " + metacpBenches.mkString(" "))
-      }
+      def metacpCommands: List[String] =
+        if (metacpBenches.isEmpty) Nil else List("bench/jmh:run " + metacpBenches.mkString(" "))
 
       def scalacBenches: List[String]
-      def scalacCommands: List[String] = {
-        if (scalacBenches.isEmpty) Nil
-        else List("bench/jmh:run " + scalacBenches.mkString(" "))
-      }
+      def scalacCommands: List[String] =
+        if (scalacBenches.isEmpty) Nil else List("bench/jmh:run " + scalacBenches.mkString(" "))
 
       def scalametaBenches: List[String]
-      def scalametaCommands: List[String] = {
+      def scalametaCommands: List[String] =
         if (scalametaBenches.isEmpty) Nil
         else List("bench/jmh:run " + scalametaBenches.mkString(" "))
-      }
 
       final def command: String = {
         val benchCommands = metacpCommands ++ scalacCommands ++ scalametaCommands

@@ -4,9 +4,10 @@ package internal
 import scala.annotation.tailrec
 
 trait MacroHelpers extends DebugFinder with MacroCompat with FreeLocalFinder with ImplTransformers {
-  import c.universe._
-  import definitions._
   import scala.reflect.internal.Flags._
+
+  import c.universe._
+  import c.universe.definitions._
 
   implicit class XtensionModifiers(mods: Modifiers) {
     def transformFlags(fn: Long => Long): Modifiers = {
@@ -30,8 +31,8 @@ trait MacroHelpers extends DebugFinder with MacroCompat with FreeLocalFinder wit
         case AnnotatedType(anns, _) => anns
         case _ => Nil
       }
-      def hasNonEmpty(anns: List[Annotation]) =
-        anns.exists(_.tree.tpe =:= typeOf[org.scalameta.invariants.nonEmpty])
+      def hasNonEmpty(anns: List[Annotation]) = anns
+        .exists(_.tree.tpe =:= typeOf[org.scalameta.invariants.nonEmpty])
       hasNonEmpty(sym.annotations) || hasNonEmpty(tptAnns)
     }
   }
@@ -49,6 +50,7 @@ trait MacroHelpers extends DebugFinder with MacroCompat with FreeLocalFinder wit
   lazy val CommonTyperMacrosModule = hygienicRef(scala.meta.internal.trees.CommonTyperMacros)
   lazy val CommonTyperMacrosBundle = hygienicRef[scala.meta.internal.trees.CommonTyperMacrosBundle]
   lazy val AstInfoClass = tq"_root_.scala.meta.internal.trees.AstInfo"
+  lazy val QuasiClass = tq"_root_.scala.meta.internal.trees.Quasi"
   lazy val TokenMetadataModule = hygienicRef(scala.meta.internal.tokens.Metadata)
   lazy val BooleanClass = hygienicRef[scala.Boolean]
   lazy val IntClass = hygienicRef[scala.Int]
@@ -69,8 +71,10 @@ trait MacroHelpers extends DebugFinder with MacroCompat with FreeLocalFinder wit
   lazy val UnsupportedOperationException = hygienicRef[UnsupportedOperationException]
   lazy val IndexOutOfBoundsException = hygienicRef[IndexOutOfBoundsException]
   lazy val IteratorClass = tq"_root_.scala.collection.Iterator"
-  lazy val ListClass = tq"_root_.scala.collection.immutable.List"
-  lazy val ListModule = q"_root_.scala.collection.immutable.List"
+  lazy val ListClass = tq"_root_.scala.List"
+  lazy val ListModule = q"_root_.scala.List"
+  lazy val SeqClass = tq"_root_.scala.Seq"
+  lazy val SeqModule = q"_root_.scala.Seq"
   lazy val ListBufferModule = hygienicRef(scala.collection.mutable.ListBuffer)
   lazy val UnitClass = hygienicRef[scala.Unit]
   lazy val ClassClass = tq"_root_.java.lang.Class"
@@ -94,82 +98,70 @@ trait MacroHelpers extends DebugFinder with MacroCompat with FreeLocalFinder wit
   def typeRef(cdef: ClassDef, requireHk: Boolean, requireWildcards: Boolean): Tree = {
     if (requireWildcards && requireHk) sys.error("invalid combination of arguments")
     val ClassDef(_, name, tparams, _) = cdef
-    if (requireHk || tparams.isEmpty) {
-      tq"$name"
-    } else {
-      if (requireWildcards) {
-        val quantrefs = tparams.map(_ => c.freshName(TypeName("_")))
-        val quantdefs = quantrefs.map(name => q"type $name")
-        tq"$name[..$quantrefs] forSome { ..$quantdefs }"
-      } else {
-        tq"$name[..${tparams.map(_.name)}]"
-      }
-    }
+    if (requireHk || tparams.isEmpty) tq"$name"
+    else if (requireWildcards) {
+      val quantrefs = tparams.map(_ => c.freshName(TypeName("_")))
+      val quantdefs = quantrefs.map(name => q"type $name")
+      tq"$name[..$quantrefs] forSome { ..$quantdefs }"
+    } else tq"$name[..${tparams.map(_.name)}]"
   }
 
   object AnyTpe {
-    def unapply(tpe: Type): Boolean = {
-      tpe =:= definitions.AnyTpe
-    }
+    def unapply(tpe: Type): Boolean = tpe =:= definitions.AnyTpe
   }
 
   object PrimitiveTpe {
     @tailrec
-    def unapply(tpe: Type): Boolean = {
-      tpe =:= typeOf[String] || tpe =:= typeOf[scala.Symbol] ||
+    def unapply(tpe: Type): Boolean = tpe =:= typeOf[String] || tpe =:= typeOf[scala.Symbol] ||
       ScalaPrimitiveValueClasses.contains(tpe.typeSymbol) ||
       tpe.typeSymbol == definitions.ClassClass ||
       tpe.typeSymbol == definitions.OptionClass && PrimitiveTpe.unapply(tpe.typeArgs.head)
-    }
   }
 
   object TreeTpe {
-    def unapply(tpe: Type): Boolean = {
-      tpe <:< c.mirror.staticClass("scala.meta.Tree").asType.toType
-    }
+    def unapply(tpe: Type): Boolean = tpe <:< c.mirror.staticClass("scala.meta.Tree").asType.toType
   }
 
   object OptionTreeTpe {
-    def unapply(tpe: Type): Option[Type] = {
-      if (tpe.typeSymbol == c.mirror.staticClass("scala.Option")) {
-        tpe.typeArgs match {
-          case (tpe @ TreeTpe()) :: Nil => Some(tpe)
-          case _ => None
-        }
-      } else None
-    }
+    def unapply(tpe: Type): Option[Type] =
+      if (tpe.typeSymbol == c.mirror.staticClass("scala.Option")) tpe.typeArgs match {
+        case (tpe @ TreeTpe()) :: Nil => Some(tpe)
+        case _ => None
+      }
+      else None
   }
 
   object ListTreeTpe {
-    def unapply(tpe: Type): Option[Type] = {
-      if (tpe.typeSymbol == c.mirror.staticClass("scala.collection.immutable.List")) {
-        tpe.typeArgs match {
-          case (tpe @ TreeTpe()) :: Nil => Some(tpe)
-          case _ => None
-        }
-      } else None
-    }
+    def unapply(tpe: Type): Option[Type] =
+      if (isListSymbol(tpe.typeSymbol)) tpe.typeArgs match {
+        case (tpe @ TreeTpe()) :: Nil => Some(tpe)
+        case _ => None
+      }
+      else None
   }
 
   object OptionListTreeTpe {
-    def unapply(tpe: Type): Option[Type] = {
-      if (tpe.typeSymbol == c.mirror.staticClass("scala.Option")) {
-        tpe.typeArgs match {
-          case ListTreeTpe(tpe) :: Nil => Some(tpe)
-          case _ => None
-        }
-      } else None
-    }
+    def unapply(tpe: Type): Option[Type] =
+      if (tpe.typeSymbol == c.mirror.staticClass("scala.Option")) tpe.typeArgs match {
+        case ListTreeTpe(tpe) :: Nil => Some(tpe)
+        case _ => None
+      }
+      else None
   }
 
   object ListListTreeTpe {
-    def unapply(tpe: Type): Option[Type] = {
-      if (tpe.typeSymbol == c.mirror.staticClass("scala.collection.immutable.List")) {
-        tpe.typeArgs match {
-          case ListTreeTpe(tpe) :: Nil => Some(tpe)
-          case _ => None
-        }
-      } else None
-    }
+    def unapply(tpe: Type): Option[Type] =
+      if (isListSymbol(tpe.typeSymbol)) tpe.typeArgs match {
+        case ListTreeTpe(tpe) :: Nil => Some(tpe)
+        case _ => None
+      }
+      else None
   }
+
+  private def isListSymbol(sym: Symbol): Boolean =
+    sym == c.mirror.staticClass("scala.collection.immutable.List") || {
+      val typeSeq = typeOf[Seq[_]]
+      sym == typeSeq.typeSymbol || typeSeq.baseClasses.contains(sym)
+    }
+
 }

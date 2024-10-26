@@ -1,92 +1,36 @@
 package scala.meta.internal.parsers
 
 import scala.meta.Dialect
-import scala.meta.tokens.Token
-import scala.meta.tokens.Token.Ident
-import scala.meta.internal.classifiers._
-import scala.meta.classifiers._
-import scala.meta.tokens.Token.LeftParen
-import scala.meta.tokens.Token.LeftBracket
+import scala.meta.Mod
 
 class SoftKeywords(dialect: Dialect) {
 
-  @classifier
-  trait KwAs {
-    val name = "as"
-    @inline def isEnabled = dialect.allowAsForImportRename
-    @inline final def unapply(token: Token): Boolean = isEnabled && name == token.toString
-    @inline final def unapply(token: String): Boolean = isEnabled && name == token
-  }
+  import Keywords._
 
-  @classifier
-  trait KwUsing {
-    val name = "using"
-    @inline def isEnabled = dialect.allowGivenUsing
-    @inline final def unapply(token: Token): Boolean = isEnabled && name == token.toString
-    @inline final def unapply(token: String): Boolean = isEnabled && name == token
-  }
+  object KwAs extends IsWithName(dialect.allowAsForImportRename, "as")
+  object KwUsing extends IsWithName(dialect.allowGivenUsing, "using")
+  object KwInline extends IsWithName(dialect.allowInlineMods, "inline")
+  object KwOpaque extends IsWithName(dialect.allowOpaqueTypes, "opaque")
+  object KwOpen extends IsWithName(dialect.allowOpenClass, "open")
+  object KwTransparent extends IsWithName(dialect.allowInlineMods, "transparent")
+  object KwDerives extends IsWithName(dialect.allowDerives, "derives")
+  object KwEnd extends IsWithName(dialect.allowEndMarker, "end")
+  object KwInfix extends IsWithName(dialect.allowInfixMods, "infix")
+  object KwExtension extends IsWithName(dialect.allowExtensionMethods, "extension")
+  object KwErased extends IsWithName(dialect.allowErasedDefs, "erased")
+  object KwTracked extends IsWithName(dialect.allowTrackedParameters, "tracked")
 
-  @classifier
-  trait KwInline {
-    val name = "inline"
-    @inline def isEnabled = dialect.allowInlineMods
-    @inline final def unapply(token: Token): Boolean = isEnabled && name == token.toString
-    @inline final def unapply(token: String): Boolean = isEnabled && name == token
-  }
+  object StarSplice extends IsWithName(dialect.allowPostfixStarVarargSplices, "*")
+  object StarAsTypePlaceholder
+      extends AsWithFunc(
+        dialect.allowStarAsTypePlaceholder,
+        {
+          case "*" => Some(None)
+          case "+*" => Some(Some(Mod.Covariant()))
+          case "-*" => Some(Some(Mod.Contravariant()))
+          case _ => None
+        }
+      )
+  object QuestionMarkAsTypeWildcard extends IsWithName(dialect.allowQuestionMarkAsTypeWildcard, "?")
 
-  @classifier
-  trait KwOpaque {
-    val name = "opaque"
-    @inline def isEnabled = dialect.allowOpaqueTypes
-    @inline final def unapply(token: Token): Boolean = isEnabled && name == token.toString
-    @inline final def unapply(token: String): Boolean = isEnabled && name == token
-  }
-
-  @classifier
-  trait KwOpen {
-    val name = "open"
-    @inline def isEnabled = dialect.allowOpenClass
-    @inline final def unapply(token: Token): Boolean = isEnabled && name == token.toString
-    @inline final def unapply(token: String): Boolean = isEnabled && name == token
-  }
-
-  @classifier
-  trait KwTransparent {
-    val name = "transparent"
-    @inline def isEnabled = dialect.allowInlineMods
-    @inline final def unapply(token: Token): Boolean = isEnabled && name == token.toString
-    @inline final def unapply(token: String): Boolean = isEnabled && name == token
-  }
-
-  @classifier
-  trait KwDerives {
-    val name = "derives"
-    @inline def isEnabled = dialect.allowDerives
-    @inline final def unapply(token: Token): Boolean = isEnabled && name == token.toString
-    @inline final def unapply(token: String): Boolean = isEnabled && name == token
-  }
-
-  @classifier
-  trait KwEnd {
-    val name = "end"
-    @inline def isEnabled = dialect.allowSignificantIndentation
-    @inline final def unapply(token: Token): Boolean = isEnabled && name == token.toString
-    @inline final def unapply(token: String): Boolean = isEnabled && name == token
-  }
-
-  @classifier
-  trait KwInfix {
-    val name = "infix"
-    @inline def isEnabled = dialect.allowInfixMods
-    @inline final def unapply(token: Token): Boolean = isEnabled && name == token.toString
-    @inline final def unapply(token: String): Boolean = isEnabled && name == token
-  }
-
-  @classifier
-  trait KwExtension {
-    val name = "extension"
-    @inline def isEnabled = dialect.allowExtensionMethods
-    @inline final def unapply(token: Token): Boolean = isEnabled && name == token.toString
-    @inline final def unapply(token: String): Boolean = isEnabled && name == token
-  }
 }

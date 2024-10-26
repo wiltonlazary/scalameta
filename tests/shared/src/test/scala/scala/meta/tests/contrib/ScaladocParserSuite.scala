@@ -1,11 +1,11 @@
 package scala.meta.tests
 package contrib
 
-import scala.meta.contrib._
-import scala.meta.contrib.DocToken._
-import scala.meta.tokens.Token.Comment
 import scala.meta.Defn
 import scala.meta._
+import scala.meta.contrib.DocToken._
+import scala.meta.contrib._
+import scala.meta.tokens.Token.Comment
 
 import munit.FunSuite
 
@@ -28,10 +28,10 @@ class ScaladocParserSuite extends FunSuite {
   test("example usage") {
     assert(
       parseString(
-        """
-          | /** Example scaladoc **/
-          | case class foo(bar: String)
-        """.stripMargin
+        """|
+           | /** Example scaladoc **/
+           | case class foo(bar: String)
+           |""".stripMargin
       ).toString == "Some(List(Description(Example scaladoc)))"
     )
   }
@@ -93,13 +93,11 @@ class ScaladocParserSuite extends FunSuite {
           */
           case class foo(bar: String)
          """
-      ) == Option(
-        List(
-          DocToken(Description, descriptionBody),
-          DocToken(Paragraph),
-          DocToken(Description, descriptionBody)
-        )
-      )
+      ) == Option(List(
+        DocToken(Description, descriptionBody),
+        DocToken(Paragraph),
+        DocToken(Description, descriptionBody)
+      ))
     )
   }
 
@@ -109,17 +107,13 @@ class ScaladocParserSuite extends FunSuite {
 
     val codeBlock1 = "\"HELLO MARIANO\""
     val codeBlock2 = "\"HELLO SORAYA\""
-    val complexCodeBlock =
-      """
-        |ggmqwogmwogmqwomgq
-        |val x = 1 // sdfdfh
-        |// zzz
-        |gmqwgoiqmgoqmwomw
-      """.stripMargin.trim
+    val complexCodeBlock = """|ggmqwogmwogmqwomgq
+                              |val x = 1 // sdfdfh
+                              |// zzz
+                              |gmqwgoiqmgoqmwomw""".stripMargin
 
-    val result: Option[List[DocToken]] =
-      parseString(
-        s"""
+    val result: Option[List[DocToken]] = parseString(
+      s"""
           /**
             * $testDescription {{{ $codeBlock1 }}}
             * $testDescription
@@ -133,21 +127,19 @@ class ScaladocParserSuite extends FunSuite {
             */
             case class foo(bar : String)
        """.stripMargin
-      )
-
-    val expectation = Option(
-      List(
-        DocToken(Description, testDescription),
-        DocToken(CodeBlock, codeBlock1),
-        DocToken(Description, testDescription),
-        DocToken(CodeBlock, codeBlock2),
-        DocToken(Paragraph),
-        DocToken(Description, testDescription),
-        DocToken(Paragraph),
-        DocToken(CodeBlock, complexCodeBlock)
-      )
     )
-    assert(result == expectation)
+
+    val expectation = Option(List(
+      DocToken(Description, testDescription),
+      DocToken(CodeBlock, codeBlock1),
+      DocToken(Description, testDescription),
+      DocToken(CodeBlock, codeBlock2),
+      DocToken(Paragraph),
+      DocToken(Description, testDescription),
+      DocToken(Paragraph),
+      DocToken(CodeBlock, complexCodeBlock)
+    ))
+    assertEquals(result, expectation)
   }
 
   test("headings") {
@@ -158,9 +150,8 @@ class ScaladocParserSuite extends FunSuite {
     val level5HeadingBody = "Level 5"
     val level6HeadingBody = "Level 6"
 
-    val result: Option[List[DocToken]] =
-      parseString(
-        s"""
+    val result: Option[List[DocToken]] = parseString(
+      s"""
         /**
           * =$level1HeadingBody=
           * ==$level2HeadingBody==
@@ -171,31 +162,27 @@ class ScaladocParserSuite extends FunSuite {
           */
          case class foo(bar : String)
          """
-      )
-    val expectation = Option(
-      List(
-        DocToken(Heading1, level1HeadingBody),
-        DocToken(Heading2, level2HeadingBody),
-        DocToken(Heading3, level3HeadingBody),
-        DocToken(Heading4, level4HeadingBody),
-        DocToken(Heading5, level5HeadingBody),
-        DocToken(Heading6, level6HeadingBody)
-      )
     )
+    val expectation = Option(List(
+      DocToken(Heading1, level1HeadingBody),
+      DocToken(Heading2, level2HeadingBody),
+      DocToken(Heading3, level3HeadingBody),
+      DocToken(Heading4, level4HeadingBody),
+      DocToken(Heading5, level5HeadingBody),
+      DocToken(Heading6, level6HeadingBody)
+    ))
     assertEquals(result, expectation)
   }
 
   test("label parsing/merging") {
     val testStringToMerge = "Test DocText"
-    val scaladoc: String =
-      DocToken.tagTokenKinds
-        .flatMap(token => List(generateTestString(token), testStringToMerge))
-        .mkString("/**\n * ", "\n * ", "\n */")
+    val scaladoc: String = DocToken.tagTokenKinds
+      .flatMap(token => List(generateTestString(token), testStringToMerge))
+      .mkString("/**\n * ", "\n * ", "\n */")
 
-    val codeToParse: String =
-      s"""
-         |$scaladoc
-         |case class Foo(bar: String)
+    val codeToParse: String = s"""
+                                 |$scaladoc
+                                 |case class Foo(bar: String)
       """.stripMargin
 
     val parsedScaladoc: Option[List[DocToken]] = parseString(codeToParse)
@@ -204,13 +191,10 @@ class ScaladocParserSuite extends FunSuite {
     assert(parsedScaladoc.map(_.size) == Option(DocToken.tagTokenKinds.size))
 
     // Inherit doc does not merge
-    assert(
-      parsedScaladoc
-        .exists(
-          _.filterNot(_.kind == DocToken.InheritDoc)
-            .forall(_.body.getOrElse("").endsWith(testStringToMerge))
-        )
-    )
+    assert(parsedScaladoc.exists(
+      _.filterNot(_.kind == DocToken.InheritDoc)
+        .forall(_.body.getOrElse("").endsWith(testStringToMerge))
+    ))
   }
 
   test("references") {
@@ -235,11 +219,9 @@ class ScaladocParserSuite extends FunSuite {
          |case class Foo(bar: String) extends AnyVal
       """.stripMargin
 
-    assert(
-      parseString(codeToParse).exists(
-        _.head.references == List(DocToken.Reference(reference1), DocToken.Reference(reference2))
-      )
-    )
+    assert(parseString(codeToParse).exists(
+      _.head.references == List(DocToken.Reference(reference1), DocToken.Reference(reference2))
+    ))
   }
 
   test("param") {
@@ -249,16 +231,7 @@ class ScaladocParserSuite extends FunSuite {
          |""".stripMargin
     )
 
-    val expectation =
-      Some(
-        List(
-          DocToken(
-            Param,
-            Some("a"),
-            Some("b")
-          )
-        )
-      )
+    val expectation = Some(List(DocToken(Param, Some("a"), Some("b"))))
 
     assertEquals(result, expectation)
   }

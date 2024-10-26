@@ -1,12 +1,15 @@
 package scala.meta.internal.bench
 
+import scala.meta.internal.bench.Scalameta._
+
 import java.nio.file._
 import java.util.concurrent.TimeUnit
-import org.openjdk.jmh.annotations._
-import org.openjdk.jmh.annotations.Mode._
-import scala.meta.internal.bench.Scalameta._
+
 import scala.tools.nsc._
 import scala.tools.nsc.reporters._
+
+import org.openjdk.jmh.annotations.Mode._
+import org.openjdk.jmh.annotations._
 
 object Scalameta {
   @State(Scope.Benchmark)
@@ -28,9 +31,8 @@ trait Scalameta {
       sys.error("compile failed")
     }
     val outdir = Paths.get(settings.outdir.value)
-    if (!Files.exists(outdir.resolve("META-INF/semanticdb"))) {
-      sys.error(s"no .semanticdb files found in $outdir")
-    }
+    if (!Files.exists(outdir.resolve("META-INF/semanticdb"))) sys
+      .error(s"no .semanticdb files found in $outdir")
   }
   def mkSettings(bs: BenchmarkState): Settings = {
     val settings = new Settings
@@ -45,16 +47,13 @@ trait Scalameta {
   }
 }
 
-@BenchmarkMode(Array(SampleTime))
-@OutputTimeUnit(TimeUnit.MILLISECONDS)
+@BenchmarkMode(Array(SampleTime)) @OutputTimeUnit(TimeUnit.MILLISECONDS)
 @Warmup(iterations = 5, time = 10, timeUnit = TimeUnit.SECONDS)
 @Measurement(iterations = 5, time = 10, timeUnit = TimeUnit.SECONDS)
 @Fork(value = 1, jvmArgs = Array("-Xms2G", "-Xmx2G"))
 class ScalametaBaseline extends Scalameta {
   @Benchmark
-  def run(bs: BenchmarkState): Unit = {
-    runImpl(bs)
-  }
+  def run(bs: BenchmarkState): Unit = runImpl(bs)
   override def mkSettings(bs: BenchmarkState): Settings = {
     val settings = super.mkSettings(bs)
     settings.pluginOptions.value ::= s"semanticdb:text:off"

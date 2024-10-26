@@ -1,30 +1,32 @@
 package scala.meta.internal.semanticdb.scalac
 
+import org.scalameta.internal.ScalaCompat.EOL
+import scala.meta.internal.{semanticdb => s}
+
 import java.io._
 import java.net.URI
-import scala.compat.Platform.EOL
+
 import scala.tools.nsc.Phase
 import scala.tools.nsc.plugins.PluginComponent
-import scala.meta.internal.{semanticdb => s}
-import scala.meta.internal.tokenizers.PlatformTokenizerCache
 import scala.util.control.NonFatal
 
-trait SemanticdbPipeline extends SemanticdbOps { self: SemanticdbPlugin =>
-  implicit class XtensionURI(uri: URI) { def toFile: File = new File(uri) }
+trait SemanticdbPipeline extends SemanticdbOps {
+  self: SemanticdbPlugin =>
+  implicit class XtensionURI(uri: URI) {
+    def toFile: File = new File(uri)
+  }
   implicit class XtensionUnit(unit: g.CompilationUnit) {
     def isIgnored: Boolean = {
       val matchesExtension = {
         val fileName = unit.source.file.name
-        fileName.endsWith(".scala") ||
-        fileName.endsWith(".sc") ||
-        fileName.endsWith(".java")
+        val lastDotIndex = fileName.lastIndexOf('.')
+        lastDotIndex > 0 && {
+          val ext = fileName.substring(lastDotIndex + 1)
+          SemanticdbPipeline.supportedExtensions.contains(ext)
+        }
       }
-      val matchesFilter = {
-        Option(unit.source.file)
-          .flatMap(f => Option(f.file))
-          .map(f => config.fileFilter.matches(f.getAbsolutePath))
-          .getOrElse(true)
-      }
+      def matchesFilter = Option(unit.source.file)
+        .forall(f => Option(f.file).forall(f => config.fileFilter.matches(f.getAbsolutePath)))
       !matchesExtension || !matchesFilter
     }
   }
@@ -45,6 +47,10 @@ trait SemanticdbPipeline extends SemanticdbOps { self: SemanticdbPlugin =>
       }
   }
 
+  object SemanticdbPipeline {
+    val supportedExtensions = Set("scala", "java", "sc", "mill")
+  }
+
   object SemanticdbTyperComponent extends PluginComponent {
     val global: SemanticdbPipeline.this.global.type = SemanticdbPipeline.this.global
     val runsAfter = List("typer")
@@ -54,24 +60,19 @@ trait SemanticdbPipeline extends SemanticdbOps { self: SemanticdbPlugin =>
     def newPhase(_prev: Phase) = new ComputeSemanticdbPhase(_prev)
     class ComputeSemanticdbPhase(prev: Phase) extends StdPhase(prev) {
 
-      def saveSemanticdbForCompilationUnit(unit: g.CompilationUnit): Unit = {
+      def saveSemanticdbForCompilationUnit(unit: g.CompilationUnit): Unit =
         try {
-          if (unit.isIgnored || !unit.source.isInSourceroot(config.sourceroot)) return
+          if (unit.isIgnored || !unit.source.isInSourceroot()) return
           val sdoc = unit.toTextDocument
           sdoc.save(config.targetroot)
-          PlatformTokenizerCache.megaCache.clear()
         } catch handleCrash(Some(unit))
-      }
 
-      override def apply(unit: g.CompilationUnit): Unit = {
-        saveSemanticdbForCompilationUnit(unit)
-      }
+      override def apply(unit: g.CompilationUnit): Unit = saveSemanticdbForCompilationUnit(unit)
 
-      private def synchronizeSourcesAndSemanticdbFiles(): Unit = {
-        RemoveOrphanSemanticdbFiles.process(config)
-      }
+      private def synchronizeSourcesAndSemanticdbFiles(): Unit = RemoveOrphanSemanticdbFiles
+        .process(config)
 
-      override def run(): Unit = {
+      override def run(): Unit =
         try {
           timestampComputeStarted = System.nanoTime()
           super.run()
@@ -82,7 +83,6 @@ trait SemanticdbPipeline extends SemanticdbOps { self: SemanticdbPlugin =>
           gSourceFileInputCache.clear()
           pointsCache.clear()
         } catch handleCrash(None)
-      }
     }
   }
 
@@ -97,10 +97,9 @@ trait SemanticdbPipeline extends SemanticdbOps { self: SemanticdbPlugin =>
     class PersistSemanticdbPhase(prev: Phase) extends StdPhase(prev) {
       override def apply(unit: g.CompilationUnit): Unit = {
         if (unit.isIgnored) return
-        try {
-          if (config.diagnostics.isOn) {
+        try if (config.diagnostics.isOn) {
             val diagnostics = unit.reportedDiagnostics(Map.empty)
-            if (diagnostics.nonEmpty && unit.source.isInSourceroot(config.sourceroot)) {
+            if (diagnostics.nonEmpty && unit.source.isInSourceroot()) {
               val sdoc = s.TextDocument(
                 schema = s.Schema.SEMANTICDB4,
                 uri = unit.source.toUri,
@@ -110,17 +109,16 @@ trait SemanticdbPipeline extends SemanticdbOps { self: SemanticdbPlugin =>
               sdoc.append(config.targetroot)
             }
           }
-        } catch handleCrash(Some(unit))
+        catch handleCrash(Some(unit))
       }
 
-      override def run(): Unit = {
+      override def run(): Unit =
         try {
           timestampPersistStarted = System.nanoTime()
           super.run()
           timestampPersistFinished = System.nanoTime()
           reportSemanticdbSummary()
         } catch handleCrash(None)
-      }
     }
   }
 

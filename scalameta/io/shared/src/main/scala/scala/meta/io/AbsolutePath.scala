@@ -1,15 +1,15 @@
 package scala.meta.io
 
+import scala.meta.internal.io.FileIO
+import scala.meta.internal.io.PathIO
+import scala.meta.internal.io.PlatformPathIO
+
 import java.io._
-import java.nio.{file => nio}
 import java.net._
 import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.Paths
-import scalapb.GeneratedMessage
-import scala.meta.internal.io.PlatformPathIO
-import scala.meta.internal.io.FileIO
-import scala.meta.internal.io.PathIO
+import java.nio.{file => nio}
 
 /** Wrapper around an absolute nio.Path. */
 sealed abstract case class AbsolutePath(toNIO: nio.Path) {
@@ -18,7 +18,7 @@ sealed abstract case class AbsolutePath(toNIO: nio.Path) {
   def toURI: URI = toURI(Files.isDirectory(toNIO))
   def toURI(isDirectory: Boolean): URI = {
     val uri = toNIO.toUri
-    if (isDirectory && uri.getPath != null && !uri.getPath.endsWith("/")) {
+    if (isDirectory && uri.getPath != null && !uri.getPath.endsWith("/"))
       // If toNIO exists, toUri will return a trailing slash, otherwise it won't (at least on JDK 8).
       // This is important because URI.resolve(String) will drop the last segment of the URI's path if
       // there is not a trailing slash:
@@ -27,9 +27,7 @@ sealed abstract case class AbsolutePath(toNIO: nio.Path) {
       //    scala> Paths.get("/tmp/test/doesExist").toUri.resolve("bar")
       //    res2: java.net.URI = file:/tmp/test/doesExist/bar
       URI.create(uri.toString + "/")
-    } else {
-      uri
-    }
+    else uri
   }
 
   def syntax: String = toString
@@ -59,16 +57,10 @@ object AbsolutePath {
   def apply(file: File)(implicit cwd: AbsolutePath): AbsolutePath = apply(file.toPath)(cwd)
   def apply(path: String)(implicit cwd: AbsolutePath): AbsolutePath = apply(Paths.get(path))(cwd)
   def apply(path: Path)(implicit cwd: AbsolutePath): AbsolutePath =
-    if (path.isAbsolute) {
-      new AbsolutePath(path) {}
-    } else {
-      cwd.resolve(path.toString)
-    }
+    if (path.isAbsolute) new AbsolutePath(path) {}
+    else cwd.resolve(path.toString)
   def fromAbsoluteUri(uri: URI)(implicit cwd: AbsolutePath): AbsolutePath = {
-    require(
-      uri.isAbsolute,
-      "This method only works on absolute URIs at present."
-    ) // Limitation of Paths.get(URI)
+    require(uri.isAbsolute, "This method only works on absolute URIs at present.") // Limitation of Paths.get(URI)
     apply(Paths.get(uri))(cwd)
   }
 }

@@ -1,74 +1,61 @@
 package scala.meta.tests
 package invariants
 
-import munit._
 import org.scalameta._
 import org.scalameta.invariants._
 
-import scala.compat.Platform.EOL
+import munit._
 
-class InvariantSuite extends FunSuite {
+class InvariantSuite extends TreeSuiteBase {
   test("more informative error messages") {
-    val x = 2
-    try require(x > 3)
-    catch {
-      case ex: InvariantFailedException =>
-        assert(ex.getMessage == """
-          |invariant failed:
-          |when verifying x.>(3)
-          |found that x.>(3) is false
-          |where x = 2
-        """.trim.stripMargin.split('\n').mkString(EOL))
+    interceptMessage[InvariantFailedException](
+      """|invariant failed:
+         |when verifying x.>(3)
+         |found that x.>(3) is false
+         |where x = 2
+         |""".stripMargin.lf2nl
+    ) {
+      val x = 2
+      require(x > 3)
     }
   }
 
   test("even more informative error messages") {
-    val y = 2
-    try {
-      case class C(x: Int) { require(x != 3 && debug(x, y)) }
+    interceptMessage[InvariantFailedException](
+      """|invariant failed:
+         |when verifying C.this.x.!=(3).&&(org.scalameta.`package`.debug(C.this.x, y))
+         |found that C.this.x is equal to 3
+         |where C = C(3)
+         |where C.this.x = 3
+         |where y = 2
+         |""".stripMargin.lf2nl
+    ) {
+      val y = 2
+      case class C(x: Int) {
+        require(x != 3 && debug(x, y))
+      }
       C(3)
-    } catch {
-      case ex: InvariantFailedException =>
-        assert(
-          ex.getMessage == """
-          |invariant failed:
-          |when verifying C.this.x.!=(3).&&(org.scalameta.`package`.debug(C.this.x, y))
-          |found that C.this.x is equal to 3
-          |where C = C(3)
-          |where C.this.x = 3
-          |where y = 2
-        """.trim.stripMargin.split('\n').mkString(EOL)
-        )
     }
   }
 
   test("unreachable - 1") {
-    try {
-      unreachable
-    } catch {
-      case ex: UnreachableError =>
-        assert(ex.getMessage == """
-          |this code path should've been unreachable
-        """.trim.stripMargin.split('\n').mkString(EOL))
-    }
+    interceptMessage[UnreachableError]("this code path should've been unreachable")(unreachable)
   }
 
   test("unreachable - 2") {
-    val y = 2
-    try {
-      case class C(x: Int) { unreachable(debug(x, y)) }
+    interceptMessage[UnreachableError](
+      """|this code path should've been unreachable
+         |where C.this.x = 3
+         |where y = 2
+         |""".stripMargin.lf2nl
+    ) {
+      val y = 2
+      case class C(x: Int) {
+        unreachable(debug(x, y))
+      }
       C(3)
-    } catch {
-      case ex: UnreachableError =>
-        assert(ex.getMessage == """
-          |this code path should've been unreachable
-          |where C.this.x = 3
-          |where y = 2
-        """.trim.stripMargin.split('\n').mkString(EOL))
     }
   }
 
-  test("don't evaluate debug") {
-    require(true && debug(throw new Exception))
-  }
+  test("don't evaluate debug")(require(true && debug(throw new Exception)))
 }

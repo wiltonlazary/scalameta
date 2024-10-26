@@ -1,13 +1,14 @@
 package scala.meta
 package tokens
 
-import scala.collection.immutable
 import org.scalameta.data._
 import org.scalameta.internal.ScalaCompat.IndexedSeqOptimized
 import scala.meta.common._
 import scala.meta.inputs._
-import scala.meta.prettyprinters._
 import scala.meta.internal.prettyprinters._
+import scala.meta.prettyprinters._
+
+import scala.collection.immutable
 
 // WONTFIX: https://github.com/scalameta/scalameta/issues/385
 // WONTFIX: https://github.com/scalameta/scalameta/issues/150
@@ -26,17 +27,26 @@ import scala.meta.internal.prettyprinters._
 // NOTE: `start` and `end` are String.substring-style,
 // i.e. `start` is inclusive and `end` is not.
 // Therefore `end` can point to the last token plus one.
-@data class Tokens private (
-    private val tokens: Array[Token],
-    private val start: Int,
-    private val end: Int
-) extends immutable.IndexedSeq[Token] with IndexedSeqOptimized[Token] {
-  def apply(idx: Int): Token = tokens(start + idx)
-  def length: Int = end - start
+@data
+class Tokens private (private val tokens: Array[Token], private val start: Int, val length: Int)
+    extends immutable.IndexedSeq[Token] with IndexedSeqOptimized[Token] {
+  @inline
+  private def get(idx: Int): Token = tokens(start + idx)
+  def apply(idx: Int): Token =
+    if (idx >= 0 && idx < length) get(idx)
+    else throw new NoSuchElementException(s"token $idx out of $length")
+  def end: Int = start + length // for MIMA compat
+
+  /** get element in full Tokens relative to start of this slice */
+  def getWideOpt(idx: Int): Option[Token] = {
+    val wideIdx = start + idx
+    if (wideIdx >= 0 && wideIdx < tokens.length) Some(tokens(wideIdx)) else None
+  }
+
   override def slice(from: Int, until: Int): Tokens = {
     val lo = start + from.max(0).min(length)
-    val hi = lo.max(start + until.min(length))
-    Tokens(tokens, lo, hi)
+    val len = 0.max(start + until.min(length) - lo)
+    new Tokens(tokens, lo, len)
   }
 
   /* Both head and headOption need to be implemented here due to
@@ -44,15 +54,67 @@ import scala.meta.internal.prettyprinters._
    * https://github.com/scala/scala/commit/b20dd00b11f06c14c823d277cdfb58043a2586fc
    */
   override def head: Token = apply(0)
+  override def headOption: Option[Token] = if (isEmpty) None else Some(get(0))
 
-  override def headOption: Option[Token] = if (isEmpty) None else Some(head)
+  override def last: Token = apply(length - 1)
+  override def lastOption: Option[Token] = if (isEmpty) None else Some(get(length - 1))
 
   override def toString = scala.meta.internal.prettyprinters.TokensToString(this)
 
-  override def segmentLength(p: Token => Boolean, from: Int = 0): Int = super.segmentLength(p, from)
+  override def segmentLength(p: Token => Boolean, from: Int = 0): Int = skipIf(p, from) - from
 
-  def segmentLengthRight(p: Token => Boolean, from: Int = 0): Int =
-    reverseIterator.drop(from).takeWhile(p).length
+  def segmentLengthRight(p: Token => Boolean, from: Int = 0): Int = {
+    val beg = length - from - 1
+    beg - rskipIf(p, beg)
+  }
+
+  @inline
+  def skipIf(p: Token => Boolean, rangeBeg: Int): Int = skipIf(p, rangeBeg, length)
+  @inline
+  def rskipIf(p: Token => Boolean, rangeBeg: Int): Int = rskipIf(p, rangeBeg, -1)
+
+  /**
+   * Skip tokens satisfying a given predicate.
+   * @param rangeBeg
+   *   first index to check
+   * @param rangeEnd
+   *   first index not to check
+   */
+  def skipIf(p: Token => Boolean, rangeBeg: Int, rangeEnd: Int): Int =
+    if (rangeBeg < 0) rangeBeg else skipIfFull(p, start + rangeBeg, start + rangeEnd.min(length))
+
+  def skipWideIf(p: Token => Boolean, rangeBeg: Int, rangeEnd: Int): Int = {
+    val beg = start + rangeBeg
+    if (beg < 0) rangeBeg else skipIfFull(p, beg, tokens.length.min(start + rangeEnd))
+  }
+
+  private def skipIfFull(p: Token => Boolean, rangeBeg: Int, rangeEnd: Int): Int = {
+    var i = rangeBeg
+    while (i < rangeEnd && p(tokens(i))) i += 1
+    i - start
+  }
+
+  /**
+   * Skip tokens satisfying a given predicate, iterating in reverse.
+   * @param rangeBeg
+   *   first index to check
+   * @param rangeEnd
+   *   first index not to check
+   */
+  def rskipIf(p: Token => Boolean, rangeBeg: Int, rangeEnd: Int): Int =
+    if (rangeBeg >= length || rangeBeg <= rangeEnd) rangeBeg
+    else rskipIfFull(p, start + rangeBeg, start + rangeEnd.max(-1))
+
+  def rskipWideIf(p: Token => Boolean, rangeBeg: Int, rangeEnd: Int): Int = {
+    val beg = start + rangeBeg
+    if (beg >= tokens.length) rangeBeg else rskipIfFull(p, beg, (start + rangeEnd).max(-1))
+  }
+
+  private def rskipIfFull(p: Token => Boolean, rangeBeg: Int, rangeEnd: Int): Int = {
+    var i = rangeBeg
+    while (i > rangeEnd && p(tokens(i))) i -= 1
+    i - start
+  }
 
   override def take(n: Int): Tokens = slice(0, n)
 
@@ -66,29 +128,26 @@ import scala.meta.internal.prettyprinters._
 
   def takeRightWhile(p: Token => Boolean): Tokens = takeRight(segmentLengthRight(p))
 
-  override def dropWhile(p: Token => Boolean): Tokens = drop(segmentLength(p, 0))
+  override def dropWhile(p: Token => Boolean): Tokens = drop(segmentLength(p))
 
   def dropRightWhile(p: Token => Boolean): Tokens = dropRight(segmentLengthRight(p))
 
   override def splitAt(n: Int): (Tokens, Tokens) = (take(n), drop(n))
 
-  override def span(p: Token => Boolean): (Tokens, Tokens) = {
-    val index = indexWhere(!p.apply(_))
+  override def span(p: Token => Boolean): (Tokens, Tokens) = splitAt(segmentLength(p))
 
-    splitAt(if (index < 0) length else index)
-  }
+  def spanRight(p: Token => Boolean): (Tokens, Tokens) = splitAt(length - segmentLengthRight(p))
 
-  def spanRight(p: Token => Boolean): (Tokens, Tokens) = {
-    val index = reverseIterator.indexWhere(!p.apply(_))
-
-    splitAt(length - (if (index < 0) length else index))
+  def findNot(p: Token => Boolean): Option[Token] = {
+    val idx = segmentLength(p)
+    if (idx < length) Some(get(idx)) else None
   }
 }
 
 object Tokens {
   private[meta] def apply(tokens: Array[Token]): Tokens = apply(tokens, 0, tokens.length)
   private[meta] def apply(tokens: Array[Token], start: Int, end: Int): Tokens =
-    new Tokens(tokens, start, end)
+    new Tokens(tokens, start, end - start)
   def unapplySeq(tokens: Tokens): Option[Seq[Token]] = Some(tokens)
 
   private def convertTokensToInput(tokens: Tokens): Input = Input.String(tokens.syntax)
@@ -96,6 +155,6 @@ object Tokens {
   implicit val listTokenToInput: Convert[List[Token], Input] =
     Convert(tokens => convertTokensToInput(Tokens(tokens.toArray)))
   implicit def showStructure[T <: Tokens]: Structure[T] = TokensStructure.apply[T]
-  implicit def showSyntax[T <: Tokens](implicit dialect: Dialect): Syntax[T] =
-    TokensSyntax.apply[T](dialect)
+  implicit def showSyntax[T <: Tokens](implicit dialect: Dialect): Syntax[T] = TokensSyntax
+    .apply[T](dialect)
 }

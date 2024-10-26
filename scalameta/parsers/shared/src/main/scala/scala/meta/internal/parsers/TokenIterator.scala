@@ -4,14 +4,18 @@ import scala.meta.tokens.Token
 
 // NOTE: public methods of TokenIterator return scannerTokens-based positions
 trait TokenIterator {
+  def hasCurr: Boolean
   def next(): Unit
-  def prevTokenPos: Int
-  def tokenPos: Int
-  def currentIndentation: Int
-  def token: Token
   def fork: TokenIterator
-  def observeIndented(): Boolean
-  def observeOutdented(): Boolean
-  def observeIndentedEnum(): Boolean
-  def undoIndent(): Unit
+
+  def prevToken: Token
+  def prevIndex: Int
+  def previousIndentation: Int
+
+  def currToken: Token
+  def currIndex: Int
+  def indenting: Boolean
+
+  def peekToken: Token
+  def peekIndex: Int
 }

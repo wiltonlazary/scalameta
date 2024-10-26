@@ -3,6 +3,7 @@ package io
 
 import scala.meta._
 import scala.meta.internal.io._
+
 import munit.FunSuite
 
 class IOSuite extends FunSuite {
@@ -21,9 +22,7 @@ class IOSuite extends FunSuite {
     assert(!obtained.contains("."))
   }
 
-  test("FileIO.listFiles(File)") {
-    assert(FileIO.listFiles(buildSbt).isEmpty)
-  }
+  test("FileIO.listFiles(File)")(assert(FileIO.listFiles(buildSbt).isEmpty))
 
   test("FileIO.listAllFilesRecursively") {
     val bin = PathIO.workingDirectory.resolve("bin")
@@ -45,7 +44,7 @@ class IOSuite extends FunSuite {
   test("AbsolutePath(relpath)(customCwd)") {
     implicit val customWorkingDirectory = AbsolutePath.root
     val obtained = AbsolutePath("foo")
-    assert(obtained == customWorkingDirectory.resolve("foo"))
+    assertEquals(obtained, customWorkingDirectory.resolve("foo"))
   }
 
 }

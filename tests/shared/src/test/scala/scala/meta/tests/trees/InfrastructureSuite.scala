@@ -1,23 +1,24 @@
 package scala.meta.tests
 package trees
 
-import munit._
 import scala.meta._
-import scala.meta.dialects.{Scala211, QuasiquoteTerm}
 
 class InfrastructureSuite extends TreeSuiteBase {
+
+  implicit val dialect: Dialect = dialects.Scala211
+
   test("become for Quasi-0") {
-    val dialect = QuasiquoteTerm(Scala211, multiline = false)
+    val dialect = this.dialect.unquoteTerm(multiline = false)
     val q = dialect("$hello").parse[Term].get.asInstanceOf[Term.Quasi]
-    assertTree(q.become[Type.Quasi])(Type.Quasi(0, Term.Name("hello")))
-    assert(q.become[Type.Quasi].pos.toString == """[0..6) in Input.String("$hello")""")
+    assertTree(q.become[Type])(Type.Quasi(0, tname("hello")))
+    assertEquals(q.become[Type].pos.toString, """[0..6) in Input.String("$hello")""")
   }
 
   test("become for Quasi-1") {
-    val dialect = QuasiquoteTerm(Scala211, multiline = false)
+    val dialect = this.dialect.unquoteTerm(multiline = false)
     val Term.Block(List(q: Stat.Quasi)) = dialect("..$hello").parse[Stat].get
-    assertTree(q.become[Type.Quasi])(Type.Quasi(1, Type.Quasi(0, Term.Name("hello"))))
-    assert(q.become[Type.Quasi].pos.toString == """[0..8) in Input.String("..$hello")""")
+    assertTree(q.become[Type])(Type.Quasi(1, Type.Quasi(0, tname("hello"))))
+    assertEquals(q.become[Type].pos.toString, """[0..8) in Input.String("..$hello")""")
   }
 
   test("copy parent") {
@@ -31,13 +32,13 @@ class InfrastructureSuite extends TreeSuiteBase {
     val x1 = "foo".parse[Term].get.asInstanceOf[Term.Name]
     val x2 = x1.copy()
     assert(x1.pos != Position.None)
-    assert(x2.pos == Position.None)
+    assertEquals(x2.pos, Position.None)
   }
 
   test("copy tokens") {
     val x1 = "foo".parse[Term].get.asInstanceOf[Term.Name]
     val x2 = x1.copy()
-    assert(x1.tokens.nonEmpty == true)
-    assert(x2.tokens.nonEmpty == true)
+    assertEquals(x1.tokens.nonEmpty, true)
+    assertEquals(x2.tokenizeFor(implicitly[Dialect]).nonEmpty, true)
   }
 }

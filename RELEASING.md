@@ -77,9 +77,9 @@ You can also do it manually. The local flow is:
 
 - run `set every version := "4.5.9"` - replace `4.5.9` with the specific version you are releasing for
 
-- run `++2.12.16` or anothe Scala version you need
+- run `++2.12.17` or another Scala version you need
 
-- run `semanticdbScalacCore/publishSigned`, `semanticdbScalacPlugin/publishSigned` and `metac/publishSigned`
+- run `semanticdbShared/publishSigned`, `semanticdbScalacCore/publishSigned`, `semanticdbScalacPlugin/publishSigned` and `semanticdbMetac/publishSigned`
 
 - make sure that everything is properly generated to `target/sonatype-staging` directory
 

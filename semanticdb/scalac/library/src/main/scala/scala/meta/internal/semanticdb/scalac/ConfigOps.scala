@@ -2,6 +2,7 @@ package scala.meta.internal.semanticdb.scalac
 
 import scala.meta.internal.io.PathIO
 import scala.meta.io._
+
 import scala.reflect.internal.util.NoPosition
 import scala.tools.nsc.reporters.Reporter
 import scala.util.matching.Regex
@@ -19,6 +20,8 @@ case class SemanticdbConfig(
     synthetics: BinaryMode,
     overrides: BinaryMode
 ) {
+  private[scalac] lazy val realSourceRoot = sourceroot.toNIO.toRealPath()
+
   def syntax: String = {
     val p = SemanticdbPlugin.name
     List(
@@ -52,6 +55,8 @@ object SemanticdbConfig {
     overrides = BinaryMode.On
   )
 
+  private val prefix = "-P:semanticdb:"
+
   private val SetFailures = "failures:(.*)".r
   private val SetProfiling = "profiling:(.*)".r
   private val SetInclude = "include:(.*)".r
@@ -79,44 +84,41 @@ object SemanticdbConfig {
       reporter: Reporter,
       base: SemanticdbConfig
   ): SemanticdbConfig = {
-    def deprecated(option: String, instead: String): Unit = {
-      reporter.warning(
-        NoPosition,
-        s"-P:semanticdb:$option is deprecated. Use -P:semanticdb:$instead instead."
-      )
-    }
+    def deprecated(option: String, instead: String): Unit = reporter
+      .warning(NoPosition, s"$prefix$option is deprecated. Use -$prefix$instead instead.")
     def unsupported(option: String, instead: String = ""): Unit = {
       val buf = new StringBuilder
-      buf.append(s"-P:semanticdb:$option is no longer supported.")
-      if (instead.nonEmpty) buf.append(s" . Use -P:semanticdb:$instead instead.")
+      buf.append(s"$prefix$option is no longer supported.")
+      if (instead.nonEmpty) buf.append(s" . Use $prefix$instead instead.")
       errFn(buf.toString)
     }
     var config = base
-    val relevantOptions = scalacOptions.filter(_.startsWith("-P:semanticdb:"))
-    val strippedOptions = relevantOptions.map(_.stripPrefix("-P:semanticdb:"))
+    val strippedOptions = scalacOptions.flatMap { x =>
+      val stripped = x.stripPrefix(prefix)
+      if (x eq stripped) None else Some(stripped)
+    }
     strippedOptions.foreach {
-      case SetFailures(FailureMode(failures)) =>
-        config = config.copy(failures = failures)
-      case SetProfiling(BinaryMode(mode)) =>
-        config = config.copy(profiling = mode)
+      case SetFailures(FailureMode(failures)) => config = config.copy(failures = failures)
+      case SetProfiling(BinaryMode(mode)) => config = config.copy(profiling = mode)
       case SetInclude(include) =>
         config = config.copy(fileFilter = config.fileFilter.copy(include = include.r))
       case SetExclude(exclude) =>
         config = config.copy(fileFilter = config.fileFilter.copy(exclude = exclude.r))
-      case SetSourceroot(path) =>
-        config = config.copy(sourceroot = AbsolutePath(path))
-      case SetTargetroot(path) =>
-        config = config.copy(targetroot = AbsolutePath(path))
-      case SetText(BinaryMode(mode)) =>
-        config = config.copy(text = mode)
-      case SetMd5(BinaryMode(mode)) =>
-        config = config.copy(md5 = mode)
-      case SetSymbols(SymbolMode(mode)) =>
-        config = config.copy(symbols = mode)
-      case SetDiagnostics(BinaryMode(mode)) =>
-        config = config.copy(diagnostics = mode)
-      case SetSynthetics(BinaryMode(mode)) =>
-        config = config.copy(synthetics = mode)
+      case SetSourceroot(pattern) =>
+        val abspath = pattern match {
+          case SetTargetroot(relative) =>
+            if (config.targetroot eq SemanticdbConfig.default.targetroot) reporter
+              .error(NoPosition, s"${prefix}sourceroot:$pattern must follow '${prefix}targetroot:'.")
+            config.targetroot.resolve(relative)
+          case p => AbsolutePath(p)
+        }
+        config = config.copy(sourceroot = abspath)
+      case SetTargetroot(path) => config = config.copy(targetroot = AbsolutePath(path))
+      case SetText(BinaryMode(mode)) => config = config.copy(text = mode)
+      case SetMd5(BinaryMode(mode)) => config = config.copy(md5 = mode)
+      case SetSymbols(SymbolMode(mode)) => config = config.copy(symbols = mode)
+      case SetDiagnostics(BinaryMode(mode)) => config = config.copy(diagnostics = mode)
+      case SetSynthetics(BinaryMode(mode)) => config = config.copy(synthetics = mode)
       // ======== COMPATIBILITY WITH 3.X STARTS ========
       case option @ SetMode("fat") =>
         deprecated(option, "text:on")
@@ -124,16 +126,11 @@ object SemanticdbConfig {
       case option @ SetMode("slim") =>
         deprecated(option, "text:off")
         config = config.copy(text = BinaryMode.Off)
-      case option @ SetMode("disabled") =>
-        unsupported(option, "exclude:^$")
-      case option @ SetDenotations(_) =>
-        unsupported(option, "symbols")
-      case option @ SetSignatures(_) =>
-        unsupported(option)
-      case option @ SetMembers(_) =>
-        unsupported(option)
-      case option @ SetOverrides(_) =>
-        unsupported(option)
+      case option @ SetMode("disabled") => unsupported(option, "exclude:^$")
+      case option @ SetDenotations(_) => unsupported(option, "symbols")
+      case option @ SetSignatures(_) => unsupported(option)
+      case option @ SetMembers(_) => unsupported(option)
+      case option @ SetOverrides(_) => unsupported(option)
       case option @ SetProfiling("console") =>
         deprecated(option, "profiling:on")
         config = config.copy(profiling = BinaryMode.On)
@@ -149,11 +146,9 @@ object SemanticdbConfig {
       case option @ "synthetics:none" =>
         deprecated(option, "synthetics:off")
         config = config.copy(synthetics = BinaryMode.Off)
-      case option @ SetOwners(_) =>
-        unsupported(option)
+      case option @ SetOwners(_) => unsupported(option)
       // ======== COMPATIBILITY WITH 3.X ENDS ========
-      case els =>
-        errFn(s"Ignoring unknown option $els")
+      case els => errFn(s"Ignoring unknown option $els")
     }
     config
   }
@@ -193,7 +188,7 @@ sealed abstract class SymbolMode {
 }
 object SymbolMode {
   def unapply(arg: String): Option[SymbolMode] = {
-    val query = arg.replaceAllLiterally("-", "")
+    val query = arg.replace("-", "")
     all.find(_.toString.equalsIgnoreCase(query))
   }
   def all = List(All, LocalOnly, None)
@@ -203,12 +198,10 @@ object SymbolMode {
 }
 
 case class FileFilter(include: Regex, exclude: Regex) {
-  def matches(path: String): Boolean =
-    include.findFirstIn(path).isDefined &&
-      exclude.findFirstIn(path).isEmpty
+  def matches(path: String): Boolean = include.findFirstIn(path).isDefined &&
+    exclude.findFirstIn(path).isEmpty
 }
 object FileFilter {
-  def apply(include: String, exclude: String): FileFilter =
-    FileFilter(include.r, exclude.r)
+  def apply(include: String, exclude: String): FileFilter = FileFilter(include.r, exclude.r)
   val matchEverything = FileFilter(".*", "$^")
 }

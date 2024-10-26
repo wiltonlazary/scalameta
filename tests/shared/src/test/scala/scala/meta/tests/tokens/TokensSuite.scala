@@ -1,13 +1,16 @@
 package scala.meta.tests
 package tokens
 
-import scala.meta._
-import scala.meta.dialects.Scala211
 import scala.meta.Token._
+import scala.meta._
+
 import munit._
 
 // NOTE: don't run anything, just make sure that stuff compiles
 class TokensSuite {
+
+  implicit val dialect: Dialect = dialects.Scala211
+
   def newToken: Token = ???
   val d: Tokens = ???
   val d1: Seq[Token] = d ++ d
@@ -18,8 +21,9 @@ class TokensSuite {
   val d5b: Seq[Token] = d5a.map(_ => newToken)
   val d5c: Seq[Token] = d.map(_.toString).flatMap(_ => List(newToken))
   val d5d: Seq[Token] = d.flatMap(_ => d)
-  val d6a: Seq[String] =
-    d.zip(List(3, 4, 5)).zipWithIndex.map { case ((x, y), _) => x.toString + y.toString }
+  val d6a: Seq[String] = d.zip(List(3, 4, 5)).zipWithIndex.map { case ((x, y), _) =>
+    x.toString + y.toString
+  }
   val d6b: Seq[Token] = d.zip(List(3, 4, 5)).zipWithIndex.map { case ((x, y), _) => newToken }
   val d6c: Seq[Token] = d.zip(List(3, 4, 5)).zipWithIndex.flatMap { case ((x, y), _) => d }
   val d7a: Seq[(Token, Int)] = d.zipWithIndex
@@ -41,31 +45,33 @@ class TokensSuite {
 }
 
 class TokensApiSuite extends FunSuite {
-  def tokenize(code: String): Tokens = {
-    val convert = scala.meta.inputs.Input.stringToInput
-    val tokenize = scala.meta.tokenizers.Tokenize.scalametaTokenize
-    val dialect = Scala211
-    code.tokenize(convert, tokenize, dialect).get
-  }
+
+  implicit val dialect: Dialect = dialects.Scala211
+
+  def tokenize(code: String): Tokens = tokenizers.Tokenize.scalametaTokenize
+    .apply(inputs.Input.String(code), dialect).get
 
   test("Maintains Tokens type when implementing collections API methods") {
     // Drop BOF and EOF to make tests more readable
     val tokens = tokenize("((1 + 1) == 2)").drop(1).dropRight(1)
 
-    assert(tokens.length == 13)
-    assert(tokens.segmentLength(_.is[LeftParen]) == 2)
-    assert(tokens.segmentLengthRight(_.is[RightParen]) == 1)
-    assert(tokens.take(2).syntax == "((")
-    assert(tokens.slice(11, 13).syntax == "2)")
-    assert(tokens.takeRight(2).syntax == "2)")
-    assert(tokens.drop(11).syntax == "2)")
-    assert(tokens.dropRight(11).syntax == "((")
-    assert(tokens.takeWhile(_.is[LeftParen]).syntax == "((")
-    assert(tokens.segmentLengthRight(_.is[RightParen]) == 1)
-    assert(tokens.takeRightWhile(_.is[RightParen]).syntax == ")")
-    assert(tokens.segmentLength(_.is[LeftParen]) == 2)
-    assert(tokens.dropWhile(_.is[LeftParen]).syntax == "1 + 1) == 2)")
-    assert(tokens.dropRightWhile(_.is[RightParen]).syntax == "((1 + 1) == 2")
+    assertEquals(tokens.length, 13)
+    assertEquals(tokens.segmentLength(_.is[LeftParen]), 2)
+    assertEquals(tokens.segmentLength(_.is[BOF]), 0)
+    assertEquals(tokens.segmentLength(!_.is[BOF]), 13)
+    assertEquals(tokens.segmentLengthRight(_.is[RightParen]), 1)
+    assertEquals(tokens.segmentLengthRight(_.is[EOF]), 0)
+    assertEquals(tokens.segmentLengthRight(!_.is[EOF]), 13)
+    assertEquals(tokens.drop(1).segmentLengthRight(!_.is[LeftParen]), 11)
+    assertEquals(tokens.take(2).syntax, "((")
+    assertEquals(tokens.slice(11, 13).syntax, "2)")
+    assertEquals(tokens.takeRight(2).syntax, "2)")
+    assertEquals(tokens.drop(11).syntax, "2)")
+    assertEquals(tokens.dropRight(11).syntax, "((")
+    assertEquals(tokens.takeWhile(_.is[LeftParen]).syntax, "((")
+    assertEquals(tokens.takeRightWhile(_.is[RightParen]).syntax, ")")
+    assertEquals(tokens.dropWhile(_.is[LeftParen]).syntax, "1 + 1) == 2)")
+    assertEquals(tokens.dropRightWhile(_.is[RightParen]).syntax, "((1 + 1) == 2")
     assert {
       val (front, back) = tokens.splitAt(8)
       front.syntax == "((1 + 1)" && back.syntax == " == 2)"
@@ -84,20 +90,20 @@ class TokensApiSuite extends FunSuite {
     val tokens = tokenize("val foo = List(1, 2, 3)")
 
     val slice = tokens.slice(0, 5)
-    assert(slice.length == 5)
-    for (i <- 0 until 5) assert(slice(i) == tokens(i))
+    assertEquals(slice.length, 5)
+    for (i <- 0 until 5) assertEquals(slice(i), tokens(i))
   }
 
   test("Tokens.slice - 'from' == 'until'") {
     val tokens = tokenize("val foo = 1")
 
-    assert(tokens.slice(1, 1).length == 0)
+    assertEquals(tokens.slice(1, 1).length, 0)
   }
 
   test("Tokens.slice - 'from' > 'until'") {
     val tokens = tokenize("val foo = 1")
 
-    assert(tokens.slice(5, 1).length == 0)
+    assertEquals(tokens.slice(5, 1).length, 0)
   }
 
   test("Tokens.slice - 'from' < 0") {
@@ -105,20 +111,20 @@ class TokensApiSuite extends FunSuite {
 
     val slice = tokens.slice(-100, 1)
 
-    assert(slice.length == 1)
-    assert(slice.head == tokens.head)
+    assertEquals(slice.length, 1)
+    assertEquals(slice.head, tokens.head)
   }
 
   test("Tokens.slice - 'from' > 'length'") {
     val tokens = tokenize("1 + 2")
 
-    assert(tokens.slice(100, 101).length == 0)
+    assertEquals(tokens.slice(100, 101).length, 0)
   }
 
   test("Tokens.slice - 'until' > 'length'") {
     val tokens = tokenize("val foo = 0")
 
-    assert(tokens.slice(0, 100) == tokens)
+    assertEquals(tokens.slice(0, 100), tokens)
   }
 
   test("Tokens.slice - multiple calls") {
@@ -126,16 +132,16 @@ class TokensApiSuite extends FunSuite {
 
     val slice = tokens.slice(0, 18).slice(5, 15).slice(6, 8)
 
-    assert(slice.length == 2)
-    assert(slice(0) == tokens(11))
-    assert(slice(1) == tokens(12))
+    assertEquals(slice.length, 2)
+    assertEquals(slice(0), tokens(11))
+    assertEquals(slice(1), tokens(12))
   }
 
   test("Tokens.span - predicate is always true") {
     val tokens = tokenize("val foo = 0")
     val (before, after) = tokens.span(_ => true)
 
-    assert(before == tokens)
+    assertEquals(before, tokens)
     assert(after.isEmpty)
   }
 
@@ -143,7 +149,40 @@ class TokensApiSuite extends FunSuite {
     val tokens = tokenize("val foo = 0")
     val (before, after) = tokens.spanRight(_ => true)
 
-    assert(after == tokens)
+    assertEquals(after, tokens)
     assert(before.isEmpty)
   }
+
+  test("Tokens.span/spanRight") {
+    def notIdent(t: Token): Boolean = t.name != "identifier"
+
+    val tokens = tokenize("val foo = 0")
+    val (beforeL, afterL) = tokens.span(notIdent)
+    val (beforeR, afterR) = tokens.spanRight(notIdent)
+
+    assertEquals(afterL.head.text, "foo")
+    assertEquals(beforeR.last.text, "foo")
+
+    assertEquals(afterL.tail, afterR)
+    assertEquals(beforeL, beforeR.dropRight(1))
+
+    val beforeLlen = beforeL.length
+    val beforeLbeg = tokens.length - beforeLlen
+    assertEquals(beforeL.rskipWideIf(notIdent, beforeLbeg, -1), beforeLlen)
+    assertEquals(beforeL.getWideOpt(beforeLlen).orNull, afterL.head)
+
+    val afterLlen = afterL.length
+    val afterLbeg = afterLlen - tokens.length
+    assertEquals(afterL.skipWideIf(notIdent, afterLbeg, tokens.length), 0)
+
+    val beforeRlen = beforeR.length
+    val beforeRbeg = tokens.length - beforeRlen
+    assertEquals(beforeR.rskipWideIf(notIdent, beforeRbeg, -1), beforeRlen - 1)
+
+    val afterRlen = afterR.length
+    val afterRbeg = afterRlen - tokens.length
+    assertEquals(afterR.skipWideIf(notIdent, afterRbeg, tokens.length), -1)
+    assertEquals(afterR.getWideOpt(-1).orNull, afterL.head)
+  }
+
 }

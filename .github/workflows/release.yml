@@ -6,21 +6,40 @@ on:
 jobs:
   publish:
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        platform:
+          - 'JVM'
+          - 'JS'
+          - 'Native'
+        isSematicdbReleased:
+          - ${{ contains(github.ref, 'semanticdb') }}
+        exclude:
+          - isSematicdbReleased: true
+            platform: 'JS'
+          - isSematicdbReleased: true
+            platform: 'Native'
     steps:
-      - uses: actions/checkout@v3
-      - uses: olafurpg/setup-scala@v13
-      - uses: olafurpg/setup-gpg@v3
-      - run: git fetch --unshallow
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: olafurpg/setup-scala@v14
+      - name: Set up JVM
+        uses: actions/setup-java@v4
+        with:
+          java-version: '8'
+          distribution: 'temurin'
+          cache: 'sbt'
+      - uses: sbt/setup-sbt@v1
       - name: Publish
         run: |
           COMMAND="ci-release"
-          UPDATE_DOCS=true
           if [[ $GITHUB_REF == "refs/tags"* ]] && [[ $GITHUB_REF_NAME == "semanticdb_v"* ]]; then
             VERSION=$(echo $GITHUB_REF_NAME | cut -d "_" -f2 | cut -c2-)
             SCALA_VERSION=$(echo $GITHUB_REF_NAME | cut -d "_" -f3)
             if [ ! -z $VERSION ] && [ ! -z $SCALA_VERSION ]; then
-              export CI_RELEASE="++$SCALA_VERSION semanticdbScalacCore/publishSigned; ++$SCALA_VERSION semanticdbScalacPlugin/publishSigned; ++$SCALA_VERSION metac/publishSigned"
-              UPDATE_DOCS=false
+              export CI_RELEASE="++$SCALA_VERSION; semanticdbShared/publishSigned; semanticdbScalacCore/publishSigned; semanticdbScalacPlugin/publishSigned; semanticdbMetac/publishSigned; semanticdbMetap/publishSigned"
               COMMAND="; set ThisBuild/version :=\"$VERSION\"; $COMMAND"
             else
               echo 'Invalid tag name. Expected: semanticdb_v${existing-release}_${scala-version}'
@@ -28,10 +47,8 @@ jobs:
             fi
           fi
           sbt "$COMMAND"
-          if [ "$UPDATE_DOCS" = true ]; then
-            sbt docs/docusaurusPublishGhpages
-          fi
         env:
+          SCALAMETA_PLATFORM: ${{ matrix.platform }}
           GIT_USER: scalameta@scalameta.org
           PGP_PASSPHRASE: ${{ secrets.PGP_PASSPHRASE }}
           PGP_SECRET: ${{ secrets.PGP_SECRET }}

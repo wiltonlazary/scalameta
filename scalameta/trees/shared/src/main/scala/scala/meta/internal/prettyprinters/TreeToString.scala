@@ -2,22 +2,19 @@ package scala.meta
 package internal
 package prettyprinters
 
-import scala.meta.internal.trees.{Quasi, Origin}
-import scala.meta.dialects.{Scala211, QuasiquoteTerm}
+import scala.meta.dialects
+import scala.meta.internal.trees.Quasi
 
 object TreeToString {
+  // this dialect is as good as any as a default
+  private val defaultDialect = dialects.Scala213
+
   def apply(tree: Tree) = {
-    val dialect = tree.origin match {
-      case x: Origin.Parsed => x.dialect
-      case Origin.None if tree.isInstanceOf[Quasi] => QuasiquoteTerm(Scala211, multiline = true)
-      case Origin.None => Scala211 // this dialect is as good as any as a default
-    }
+    val isQuasi = tree.isInstanceOf[Quasi]
+    val dialect = tree.origin.dialectOpt
+      .getOrElse(if (isQuasi) defaultDialect.unquoteTerm(multiline = true) else defaultDialect)
     val prettyprinter = TreeSyntax[Tree](dialect)
     val code = prettyprinter(tree).toString
-    tree match {
-      case _: Quasi => code
-      case Ctor.Primary(_, name, _) => s"def this$code"
-      case _ => code
-    }
+    if (!isQuasi && tree.isInstanceOf[Ctor.Primary]) s"def this$code" else code
   }
 }

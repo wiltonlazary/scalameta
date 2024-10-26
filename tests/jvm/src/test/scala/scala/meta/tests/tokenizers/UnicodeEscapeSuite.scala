@@ -1,8 +1,9 @@
 package scala.meta.tests.tokenizers
 
-import java.nio.charset.StandardCharsets
-import scala.meta.internal.io.InputStreamIO
 import org.scalameta.logger
+import scala.meta.internal.io.InputStreamIO
+
+import java.nio.charset.StandardCharsets
 
 class UnicodeEscapeSuite extends BaseTokenizerSuite {
   // Read tests from external file because scalac processes string literals in source
@@ -16,14 +17,12 @@ class UnicodeEscapeSuite extends BaseTokenizerSuite {
   )
 
   // asserts that tokenize(code).syntax == code
-  def checkRoundtrip(original: String): Unit = {
-    test(logger.revealWhitespace(original)) {
-      val tokens = tokenize(original)
-      val obtained = tokens.mkString
-      assertNoDiff(obtained, original)
-    }
+  def checkRoundtrip(original: String): Unit = test(logger.revealWhitespace(original)) {
+    val tokens = tokenize(original)
+    val obtained = tokens.toString
+    assertNoDiff(obtained, original)
   }
 
-  tests.linesIterator.foreach { line => checkRoundtrip(line) }
+  tests.linesIterator.foreach(line => checkRoundtrip(line))
 
 }

@@ -14,6 +14,7 @@ object RoundtripSuite {
     case q"${name: Term.Name}" => q"${name: Term.Name}"
     case q"$expr.$name" => q"$expr.$name"
     case q"$expr(...$exprssnel)" => q"$expr(...$exprssnel)"
+    case q"$expr(..$exprssnel)" => q"$expr(..$exprssnel)"
     case q"$expr[..$tpesnel]" => q"$expr[..$tpesnel]"
     case q"$expr1 $name[..$tpes] $expr2" => q"$expr1 $name[..$tpes] $expr2"
     case q"$expr $name[..$tpes] (..$exprs)" => q"$expr $name[..$tpes] (..$exprs)"
@@ -23,6 +24,7 @@ object RoundtripSuite {
     case q"+$expr" => q"+$expr"
     case q"$ref = $expr" => q"$ref = $expr"
     case q"$expr1(...$exprssnel) = $expr2" => q"$expr1(...$exprssnel) = $expr2"
+    case q"$expr1(..$exprssnel) = $expr2" => q"$expr1(..$exprssnel) = $expr2"
     case q"return $expr" => q"return $expr"
     case q"throw $expr" => q"throw $expr"
     case q"$expr: $tpe" => q"$expr: $tpe"
@@ -85,12 +87,12 @@ object RoundtripSuite {
     case q"..$mods def $name[..$tparams](...$paramss): $tpeopt = macro $expr" =>
       q"..$mods def $name[..$tparams](...$paramss): $tpeopt = macro $expr"
     case q"..$mods type $tname[..$tparams] = $tpe" => q"..$mods type $tname[..$tparams] = $tpe"
-    case q"..$mods class $tname[..$tparams] ..$ctorMods (...$paramss) extends $template" =>
-      q"..$mods class $tname[..$tparams] ..$ctorMods (...$paramss) extends $template"
-    case q"..$mods trait $tname[..$tparams] extends $template" =>
-      q"..$mods trait $tname[..$tparams] extends $template"
-    case q"..$mods object $name extends $template" => q"..$mods object $name extends $template"
-    case q"package object $name extends $template" => q"package object $name extends $template"
+    case q"..$mods class $tname[..$tparams] ..$ctorMods (...$paramss) $template" =>
+      q"..$mods class $tname[..$tparams] ..$ctorMods (...$paramss) $template"
+    case q"..$mods trait $tname[..$tparams] $template" =>
+      q"..$mods trait $tname[..$tparams] $template"
+    case q"..$mods object $name $template" => q"..$mods object $name $template"
+    case q"package object $name $template" => q"package object $name $template"
     case q"package $ref { ..$stats }" => q"package $ref { ..$stats }"
     case q"..$mods def this(...$paramss)" => q"..$mods def this(...$paramss)"
     case q"..$mods def this(...$paramss) = $expr" => q"..$mods def this(...$paramss) = $expr"
@@ -99,6 +101,7 @@ object RoundtripSuite {
     case tparam"..$mods $tparamname[..$tparams] >: $tpeopt1 <: $tpeopt2 <% ..$tpes1 : ..$tpes2" =>
       tparam"..$mods $tparamname[..$tparams] >: $tpeopt1 <: $tpeopt2 <% ..$tpes1 : ..$tpes2"
     case init"$tpe(...$exprss)" => init"$tpe(...$exprss)"
+    case init"$tpe(..$exprss)" => init"$tpe(..$exprss)"
     case template"{ ..$stats1 } with ..$ctorcalls { $param => ..$stats2 }" =>
       template"{ ..$stats1 } with ..$ctorcalls { $param => ..$stats2 }"
     case mod"@$annot" => mod"@$annot"

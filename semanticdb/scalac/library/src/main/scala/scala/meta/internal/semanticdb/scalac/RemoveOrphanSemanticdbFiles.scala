@@ -1,13 +1,14 @@
 package scala.meta.internal.semanticdb.scalac
 
+import scala.meta.internal.io.PathIO
+import scala.meta.io.AbsolutePath
+
 import java.io.IOException
 import java.nio.file.FileVisitResult
 import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.SimpleFileVisitor
 import java.nio.file.attribute.BasicFileAttributes
-import scala.meta.internal.io.PathIO
-import scala.meta.io.AbsolutePath
 
 object RemoveOrphanSemanticdbFiles {
 
@@ -24,9 +25,8 @@ object RemoveOrphanSemanticdbFiles {
         override def visitFile(file: Path, attrs: BasicFileAttributes): FileVisitResult = {
           if (PathIO.extension(file.getFileName) == SemanticdbPaths.semanticdbExtension) {
             val scalafile = SemanticdbPaths.toScala(AbsolutePath(file), sourceroot, targetroot)
-            if (!scalafile.isFile || !config.fileFilter.matches(scalafile.toString)) {
-              Files.deleteIfExists(file)
-            }
+            if (!scalafile.isFile || !config.fileFilter.matches(scalafile.toString)) Files
+              .deleteIfExists(file)
           }
           FileVisitResult.CONTINUE
         }
@@ -34,9 +34,7 @@ object RemoveOrphanSemanticdbFiles {
           val files = Files.newDirectoryStream(dir)
           val isEmpty = !files.iterator().hasNext
           files.close()
-          if (isEmpty) {
-            Files.delete(dir)
-          }
+          if (isEmpty) Files.delete(dir)
           FileVisitResult.CONTINUE
         }
       }

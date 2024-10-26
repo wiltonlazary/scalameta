@@ -1,10 +1,9 @@
 package scala.meta.tests
 package transversers
 
-import munit._
 import scala.meta._
 
-class TraverserSuite extends FunSuite {
+class TraverserSuite extends TreeSuiteBase {
 
   test("Traverser Ok") {
     val tree0 = q"""
@@ -21,40 +20,48 @@ class TraverserSuite extends FunSuite {
       }
     }
     traverser(tree0)
-    assert(
-      log
-        .mkString("\n")
-        .replace("\r", "") == """
-      |{   def foo(x: x)(x: Int) = x + x   class C(x: x) { def bar(x: x) = ??? } }
-      |def foo(x: x)(x: Int) = x + x
-      |foo
-      |x: x
-      |x
-      |x
-      |x: Int
-      |x
-      |Int
-      |x + x
-      |x
-      |+
-      |x
-      |class C(x: x) { def bar(x: x) = ??? }
-      |C
-      |def this(x: x)
-      |_
-      |x: x
-      |x
-      |x
-      |{ def bar(x: x) = ??? }
-      |_
-      |_
-      |def bar(x: x) = ???
-      |bar
-      |x: x
-      |x
-      |x
-      |???
-    """.trim.stripMargin
+    assertEquals(
+      log.mkString("", "\n", "\n").nl2lf,
+      """|def foo(x: x)(x: Int) = x + x       class C(x: x) {         def bar(x: x) = ???       }
+         |def foo(x: x)(x: Int) = x + x
+         |foo
+         |(x: x)(x: Int)
+         |
+         |(x: x)
+         |x: x
+         |x
+         |x
+         |(x: Int)
+         |x: Int
+         |x
+         |Int
+         |x + x
+         |x
+         |+
+         |
+         |x
+         |x
+         |class C(x: x) {         def bar(x: x) = ???       }
+         |C
+         |
+         |def this(x: x)
+         |
+         |(x: x)
+         |x: x
+         |x
+         |x
+         |{         def bar(x: x) = ???       }
+         |{         def bar(x: x) = ???       }
+         |def bar(x: x) = ???
+         |bar
+         |(x: x)
+         |
+         |(x: x)
+         |x: x
+         |x
+         |x
+         |???
+         |""".stripMargin
     )
   }
 }

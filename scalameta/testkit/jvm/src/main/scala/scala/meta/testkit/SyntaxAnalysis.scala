@@ -1,11 +1,14 @@
 package scala.meta.testkit
 
+import org.scalameta.collections._
+import scala.meta._
+
 import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.atomic.AtomicInteger
 
-import scala.collection.{GenIterable, GenTraversableOnce, mutable}
-import scala.collection.JavaConverters._
-import scala.meta._
+import scala.collection.GenIterable
+import scala.collection.GenTraversableOnce
+import scala.collection.mutable
 import scala.util.control.NonFatal
 
 object SyntaxAnalysis {
@@ -23,20 +26,17 @@ object SyntaxAnalysis {
    * @return
    *   The aggregate sum of all analysis results.
    */
-  def run[T](corpus: GenTraversableOnce[CorpusFile])(
-      f: CorpusFile => List[T]
-  ): mutable.Buffer[(CorpusFile, T)] = Phase.run("syntax analysis") {
+  def run[T](
+      corpus: GenTraversableOnce[CorpusFile]
+  )(f: CorpusFile => List[T]): mutable.Buffer[(CorpusFile, T)] = Phase.run("syntax analysis") {
     val results = new CopyOnWriteArrayList[(CorpusFile, T)]
     val counter = new AtomicInteger()
     val errors = new AtomicInteger()
     def analyze(file: CorpusFile): Unit = {
       val n = counter.incrementAndGet()
-      if (n % 1000 == 0) {
-        println(n)
-      }
-      try {
-        f(file).foreach(t => results.add(file -> t))
-      } catch {
+      if (n % 1000 == 0) println(n)
+      try f(file).foreach(t => results.add(file -> t))
+      catch {
         // TODO(olafur) investigate these scala.meta errors.
         case _: org.scalameta.UnreachableError => // scala.meta error
         case _: org.scalameta.invariants.InvariantFailedException => // scala.meta error
@@ -49,22 +49,19 @@ object SyntaxAnalysis {
           val stack = e.getStackTrace.take(10) // print small stacktrace
           stack.foreach(println)
           val i = errors.incrementAndGet()
-          if (i > 10) {
-            throw new IllegalStateException(
-              "Too many unexpected errors (printed to console), fix your analysis."
-            )
-          }
+          if (i > 10) throw new IllegalStateException(
+            "Too many unexpected errors (printed to console), fix your analysis."
+          )
       }
     }
     corpus.foreach(analyze)
-    results.asScala
+    results.toScalaBuffer
   }
 
-  def onParsed[A](
-      corpus: GenIterable[CorpusFile]
-  )(f: Source => List[A]): mutable.Buffer[(CorpusFile, A)] =
-    SyntaxAnalysis.run[A](corpus)(_.jFile.parse[Source] match {
-      case parsers.Parsed.Success(ast: Source) => f(ast)
-      case _ => Nil
-    })
+  def onParsed[A](corpus: GenIterable[CorpusFile])(
+      f: Source => List[A]
+  ): mutable.Buffer[(CorpusFile, A)] = SyntaxAnalysis.run[A](corpus)(_.jFile.parse[Source] match {
+    case parsers.Parsed.Success(ast: Source) => f(ast)
+    case _ => Nil
+  })
 }

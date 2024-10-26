@@ -1,6 +1,7 @@
 package scala.meta.internal.io
 
 import scala.meta.io._
+
 import scala.scalajs.js
 import scala.scalajs.js.annotation.JSImport
 import scala.scalajs.js.annotation.JSImport.Namespace
@@ -98,21 +99,13 @@ object JSIO {
 
   def inNode[T](f: => T): T =
     if (JSIO.isNode) f
-    else {
-      throw new IllegalStateException("This operation is not supported in this environment.")
-    }
+    else throw new IllegalStateException("This operation is not supported in this environment.")
 
-  def cwd(): String =
-    if (isNode) process.cwd()
-    else "/"
+  def cwd(): String = if (isNode) process.cwd() else "/"
 
-  def exists(path: String): Boolean =
-    if (isNode) JSFs.existsSync(path)
-    else false
+  def exists(path: String): Boolean = if (isNode) JSFs.existsSync(path) else false
 
-  def isFile(path: String): Boolean =
-    exists(path) && JSFs.lstatSync(path).isFile()
+  def isFile(path: String): Boolean = exists(path) && JSFs.lstatSync(path).isFile()
 
-  def isDirectory(path: String): Boolean =
-    exists(path) && JSFs.lstatSync(path).isDirectory()
+  def isDirectory(path: String): Boolean = exists(path) && JSFs.lstatSync(path).isDirectory()
 }

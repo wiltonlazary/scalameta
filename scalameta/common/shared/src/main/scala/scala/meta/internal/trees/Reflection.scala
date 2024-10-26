@@ -2,17 +2,17 @@ package scala.meta
 package internal
 package trees
 
-import scala.language.implicitConversions
-import scala.collection.mutable
 import org.scalameta.adt.{Reflection => AdtReflection}
 
 import scala.annotation.tailrec
+import scala.collection.mutable
+import scala.language.implicitConversions
 
 trait Reflection extends AdtReflection {
+  import u.Flag._
   import u._
-  import internal._
-  import decorators._
-  import Flag._
+  import u.internal._
+  import u.internal.decorators._
 
   def Protected: Modifiers = Modifiers(PROTECTED)
   def PrivateMeta: Modifiers = PrivateMeta(NoFlags)
@@ -21,11 +21,8 @@ trait Reflection extends AdtReflection {
   lazy val TreeSymbol = mirror.staticClass("scala.meta.Tree")
   lazy val QuasiSymbol = mirror.staticClass("scala.meta.internal.trees.Quasi")
   lazy val AllModule = mirror.staticModule("scala.meta.internal.trees.All")
-  lazy val RegistryAnnotation = mirror
-    .staticModule("scala.meta.internal.trees.Metadata")
-    .info
-    .member(TypeName("registry"))
-    .asClass
+  lazy val RegistryAnnotation = mirror.staticModule("scala.meta.internal.trees.Metadata").info
+    .member(TypeName("registry")).asClass
 
   override protected def figureOutDirectSubclasses(sym: ClassSymbol): List[Symbol] = {
     def fail = sys.error(s"failed to figure out direct subclasses for ${sym.fullName}")
@@ -35,11 +32,11 @@ trait Reflection extends AdtReflection {
   }
 
   // NOTE: this is supposed to map root/branch/ast classes to their direct subclasses
-  private lazy val scalaMetaRegistry: Map[Symbol, List[Symbol]] = {
+  private lazy val scalaMetaRegistry: Map[Symbol, List[Symbol]] =
     AllModule.initialize.annotations match {
       case List(ann) if ann.tree.tpe =:= RegistryAnnotation.toType =>
         val q"new $_($_.$_[..$_](..${astPaths: List[String]}))" = ann.tree
-        val astClasses = astPaths.map(astPath => {
+        val astClasses = astPaths.map { astPath =>
           @tailrec
           def locateModule(root: ModuleSymbol, parts: List[String]): ModuleSymbol = parts match {
             case Nil => root
@@ -47,28 +44,26 @@ trait Reflection extends AdtReflection {
           }
           val modulePath :+ className = astPath.split('.').toList
           locateModule(mirror.RootPackage, modulePath).info.member(TypeName(className)).asClass
-        })
+        }
         val entireHierarchy = {
           var result = astClasses.flatMap(_.baseClasses.map(_.asClass))
           result = result.filter(sym => sym.toType <:< TreeSymbol.toType)
-          result =
-            result.flatMap(sym => List(sym, sym.companion.info.member(TypeName("Quasi")).asClass))
+          result = result
+            .flatMap(sym => List(sym, sym.companion.info.member(TypeName("Quasi")).asClass))
           result :+= QuasiSymbol
           result.distinct
         }
         val registry = mutable.Map[Symbol, List[Symbol]]()
         entireHierarchy.foreach(sym => registry(sym) = Nil)
-        entireHierarchy.foreach(sym => {
+        entireHierarchy.foreach { sym =>
           val parents = sym.info.asInstanceOf[ClassInfoType].parents.map(_.typeSymbol)
-          val relevantParents =
-            parents.filter(p => p.isClass && p.asClass.baseClasses.contains(TreeSymbol))
+          val relevantParents = parents
+            .filter(p => p.isClass && p.asClass.baseClasses.contains(TreeSymbol))
           relevantParents.foreach(parent => registry(parent) :+= sym)
-        })
+        }
         registry.toMap
-      case _ =>
-        sys.error("failed to figure out meta trees")
+      case _ => sys.error("failed to figure out meta trees")
     }
-  }
 
   implicit class XtensionAstTree(tree: Tree) {
     def detectAst: List[String] = {
@@ -78,7 +73,9 @@ trait Reflection extends AdtReflection {
         var inner = false
         trait Path
         object Path {
-          private def path(s: String): Path = new Path { override def toString = s }
+          private def path(s: String): Path = new Path {
+            override def toString = s
+          }
           implicit def nameToPath(name: Name): Path = path(name.decodedName.toString)
           implicit def reftreeToPath(tree: RefTree): Path = path(tree.toString)
         }
@@ -96,8 +93,7 @@ trait Reflection extends AdtReflection {
           case PackageDef(pid, stats) =>
             if (pid.name == termNames.EMPTY_PACKAGE_NAME) super.traverse(tree)
             else drilldown(pid, inner = false)(super.traverse(tree))
-          case ModuleDef(_, name, _) =>
-            drilldown(name, inner = false)(super.traverse(tree))
+          case ModuleDef(_, name, _) => drilldown(name, inner = false)(super.traverse(tree))
           case ClassDef(Modifiers(_, _, anns), name, _, impl) =>
             if (anns.exists(_.toString == "new ast()")) {
               if (inner) sys.error("@ast classes can't be inner: " + name)
@@ -106,8 +102,7 @@ trait Reflection extends AdtReflection {
               drilldown(name, inner = true)(result += module)
             }
             drilldown(name, inner = true)(super.traverse(tree))
-          case _ =>
-            super.traverse(tree)
+          case _ => super.traverse(tree)
         }
       }
       astClassDetector.traverse(tree)

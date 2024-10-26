@@ -1,7 +1,8 @@
 package scala.meta.contrib.equality
 
-import scala.language.implicitConversions
 import scala.meta.Tree
+
+import scala.language.implicitConversions
 
 /**
  * Represents syntactic equality between trees Two trees are syntactically equal if their .syntax is
@@ -17,12 +18,10 @@ class Syntactically[+A <: Tree](val tree: A) extends TreeEquality[A] {
 }
 
 object Syntactically {
-  def apply[A <: Tree](tree: A): Syntactically[A] =
-    new Syntactically(tree)
+  def apply[A <: Tree](tree: A): Syntactically[A] = new Syntactically(tree)
 
-  implicit def SyntacticEq[A <: Tree]: Equal[Syntactically[A]] =
-    new Equal[Syntactically[A]] {
-      override def isEqual(a: Syntactically[A], b: Syntactically[A]): Boolean = a.equals(b)
-    }
+  implicit def SyntacticEq[A <: Tree]: Equal[Syntactically[A]] = new Equal[Syntactically[A]] {
+    override def isEqual(a: Syntactically[A], b: Syntactically[A]): Boolean = a.equals(b)
+  }
   implicit def toSyntactic[A <: Tree](e: A): Syntactically[A] = apply(e)
 }

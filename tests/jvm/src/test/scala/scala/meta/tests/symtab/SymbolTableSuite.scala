@@ -1,19 +1,18 @@
 package scala.meta.tests.symtab
 
-import munit.FunSuite
 import scala.meta.internal.symtab.AggregateSymbolTable
 import scala.meta.internal.symtab.GlobalSymbolTable
 import scala.meta.internal.symtab.LocalSymbolTable
-import scala.meta.tests.metacp.Library
 import scala.meta.internal.{semanticdb => s}
 import scala.meta.io.Classpath
 import scala.meta.tests.BuildInfo
+import scala.meta.tests.metacp.Library
+
+import munit.FunSuite
 
 class SymbolTableSuite extends FunSuite {
-  private val classpath =
-    Classpath(BuildInfo.databaseClasspath) ++
-      Classpath(BuildInfo.commonJVMClassDirectory) ++
-      Library.scalaLibrary.classpath()
+  private val classpath = Classpath(BuildInfo.databaseClasspath) ++
+    Classpath(BuildInfo.commonJVMClassDirectory) ++ Library.scalaLibrary.classpath()
   private val globalSymtab = GlobalSymbolTable(classpath, includeJdk = true)
 
   def checkNotExists(symbol: String): Unit = {
@@ -24,12 +23,10 @@ class SymbolTableSuite extends FunSuite {
     }
   }
 
-  def check(symbol: String)(f: s.SymbolInformation => Boolean): Unit = {
-    test(symbol) {
-      val obtained = globalSymtab.info(symbol)
-      assert(obtained.nonEmpty, symbol)
-      assert(f(obtained.get), obtained.get.toProtoString)
-    }
+  def check(symbol: String)(f: s.SymbolInformation => Boolean): Unit = test(symbol) {
+    val obtained = globalSymtab.info(symbol)
+    assert(obtained.nonEmpty, symbol)
+    assert(f(obtained.get), obtained.get.toProtoString)
   }
 
   // jar classpath entries
@@ -73,7 +70,7 @@ class SymbolTableSuite extends FunSuite {
     val aggregateSymtab = AggregateSymbolTable(List(localSymtab, globalSymtab))
     val local0 = aggregateSymtab.info("local0").get
     assert(local0.isType)
-    assert(local0.displayName == "_")
+    assertEquals(local0.displayName, "_")
   }
 
   test("SymbolTable.toString") {

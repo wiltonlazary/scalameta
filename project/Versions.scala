@@ -2,26 +2,25 @@ package org.scalameta
 package build
 
 object Versions {
-  val LatestScala211 = "2.11.12"
-  val LatestScala212 = "2.12.16"
-  val LatestScala213 = "2.13.8"
-  val LegacyScalaVersions =
-    List(
-      "2.12.8",
-      "2.12.9",
-      "2.12.10",
-      "2.12.11",
-      "2.12.12",
-      "2.12.13",
-      "2.12.14",
-      "2.12.15",
-      "2.13.0",
-      "2.13.1",
-      "2.13.2",
-      "2.13.3",
-      "2.13.4",
-      "2.13.5",
-      "2.13.6",
-      "2.13.7"
-    )
+  val Scala211Versions = getVersions(2, 11, 12 to 12)
+  val Scala212Versions = getVersions(2, 12, 17 to 20)
+  val Scala213Versions = getVersions(2, 13, 12 to 15)
+  val LatestScala211 = Scala211Versions.head
+  val LatestScala212 = Scala212Versions.head
+  val LatestScala213 = Scala213Versions.head
+  val EarliestScala211 = Scala211Versions.last
+  val EarliestScala212 = Scala212Versions.last
+  val EarliestScala213 = Scala213Versions.last
+  val AllScalaVersions = Scala213Versions ++ Scala212Versions ++ Scala211Versions
+  val EarliestScalaVersions = Seq(EarliestScala213, EarliestScala212, EarliestScala211)
+  val LatestScalaVersions = Seq(LatestScala213, LatestScala212, LatestScala211)
+
+  // returns versions from newest to oldest
+  private def getVersions(major: Int, minor: Int, range: Range) = {
+    if (range.length > 4)
+      throw new Exception(s"Too many versions for scala-$major.$minor: ${range.length} > 4")
+    val desc = if (range.step > 0) range.reverse else range
+    desc.map(x => s"$major.$minor.$x")
+  }
+
 }

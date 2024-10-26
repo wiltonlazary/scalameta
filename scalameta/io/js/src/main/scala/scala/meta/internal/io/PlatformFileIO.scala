@@ -1,28 +1,24 @@
 package scala.meta.internal.io
 
+import scala.meta.io._
+
 import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
 import java.io.InputStream
 import java.net.URI
 import java.nio.charset.Charset
 import java.nio.file.Paths
+
 import scala.scalajs.js.JSConverters._
-import scalapb.GeneratedMessage
-import scala.meta.internal.semanticdb._
-import scala.meta.internal.io._
-import scala.meta.io._
 
 object PlatformFileIO {
-  def newInputStream(uri: URI): InputStream =
-    new ByteArrayInputStream(readAllBytes(uri))
+  def newInputStream(uri: URI): InputStream = new ByteArrayInputStream(readAllBytes(uri))
 
   def readAllBytes(uri: URI): Array[Byte] =
     if (uri.getScheme == "file") {
       val filepath = Paths.get(uri)
       readAllBytes(AbsolutePath(filepath.toString))
-    } else {
-      throw new UnsupportedOperationException(s"Can't read $uri as InputStream")
-    }
+    } else throw new UnsupportedOperationException(s"Can't read $uri as InputStream")
 
   def readAllBytes(path: AbsolutePath): Array[Byte] = JSIO.inNode {
     val jsArray = JSFs.readFileSync(path.toString)
@@ -36,21 +32,21 @@ object PlatformFileIO {
     result
   }
 
-  def readAllDocuments(path: AbsolutePath): Seq[TextDocument] = JSIO.inNode {
+  def read[A](path: AbsolutePath)(implicit isio: InputStreamIO[A]): A = JSIO.inNode {
     val bytes = readAllBytes(path)
-    TextDocuments.parseFrom(bytes).documents
+    isio.read(bytes)
   }
 
-  def write(path: AbsolutePath, proto: GeneratedMessage): Unit = JSIO.inNode {
+  def write[A](path: AbsolutePath, msg: A)(implicit osio: OutputStreamIO[A]): Unit = JSIO.inNode {
     JSFs.mkdirSync(path.toNIO.getParent.toString)
     val os = new ByteArrayOutputStream
-    proto.writeTo(os)
+    osio.write(msg, os)
     val buffer = os.toByteArray.map(_.toInt).toJSArray
     JSFs.writeFileSync(path.toString, buffer)
   }
 
-  def slurp(path: AbsolutePath, charset: Charset): String =
-    JSIO.inNode(JSFs.readFileSync(path.toString, charset.toString))
+  def slurp(path: AbsolutePath, charset: Charset): String = JSIO
+    .inNode(JSFs.readFileSync(path.toString, charset.toString))
 
   def listFiles(path: AbsolutePath): ListFiles = JSIO.inNode {
     if (path.isFile) new ListFiles(path, Nil)
@@ -67,18 +63,14 @@ object PlatformFileIO {
     }
   }
 
-  def isFile(path: AbsolutePath): Boolean =
-    JSIO.isFile(path.toString)
+  def isFile(path: AbsolutePath): Boolean = JSIO.isFile(path.toString)
 
-  def isDirectory(path: AbsolutePath): Boolean =
-    JSIO.isDirectory(path.toString)
+  def isDirectory(path: AbsolutePath): Boolean = JSIO.isDirectory(path.toString)
 
   def listAllFilesRecursively(root: AbsolutePath): ListFiles = {
     val builder = List.newBuilder[RelativePath]
-    def loop(path: AbsolutePath): Unit = {
-      if (path.isDirectory) listFiles(path).foreach(loop)
-      else builder += path.toRelative(root)
-    }
+    def loop(path: AbsolutePath): Unit =
+      if (path.isDirectory) listFiles(path).foreach(loop) else builder += path.toRelative(root)
     loop(root)
     new ListFiles(root, builder.result())
   }
@@ -88,6 +80,5 @@ object PlatformFileIO {
 
   def withJarFileSystem[T](path: AbsolutePath, create: Boolean, close: Boolean = false)(
       f: AbsolutePath => T
-  ): T =
-    throw new UnsupportedOperationException("Can't expand jar file in Scala.js")
+  ): T = throw new UnsupportedOperationException("Can't expand jar file in Scala.js")
 }

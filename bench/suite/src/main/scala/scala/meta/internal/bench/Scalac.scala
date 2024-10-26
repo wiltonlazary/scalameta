@@ -1,12 +1,15 @@
 package scala.meta.internal.bench
 
+import scala.meta.internal.bench.Scalac._
+
 import java.nio.file._
 import java.util.concurrent.TimeUnit
-import org.openjdk.jmh.annotations._
-import org.openjdk.jmh.annotations.Mode._
-import scala.meta.internal.bench.Scalac._
+
 import scala.tools.nsc._
 import scala.tools.nsc.reporters._
+
+import org.openjdk.jmh.annotations.Mode._
+import org.openjdk.jmh.annotations._
 
 object Scalac {
   @State(Scope.Benchmark)
@@ -33,28 +36,22 @@ trait Scalac {
   }
 }
 
-@BenchmarkMode(Array(SampleTime))
-@OutputTimeUnit(TimeUnit.MILLISECONDS)
+@BenchmarkMode(Array(SampleTime)) @OutputTimeUnit(TimeUnit.MILLISECONDS)
 @Warmup(iterations = 5, time = 10, timeUnit = TimeUnit.SECONDS)
 @Measurement(iterations = 5, time = 10, timeUnit = TimeUnit.SECONDS)
 @Fork(value = 1, jvmArgs = Array("-Xms2G", "-Xmx2G"))
 class ScalacBaseline extends Scalac {
   @Benchmark
-  def run(bs: BenchmarkState): Unit = {
-    runImpl(bs)
-  }
+  def run(bs: BenchmarkState): Unit = runImpl(bs)
 }
 
-@BenchmarkMode(Array(SampleTime))
-@OutputTimeUnit(TimeUnit.MILLISECONDS)
+@BenchmarkMode(Array(SampleTime)) @OutputTimeUnit(TimeUnit.MILLISECONDS)
 @Warmup(iterations = 5, time = 10, timeUnit = TimeUnit.SECONDS)
 @Measurement(iterations = 5, time = 10, timeUnit = TimeUnit.SECONDS)
 @Fork(value = 1, jvmArgs = Array("-Xms2G", "-Xmx2G"))
 class ScalacRangepos extends Scalac {
   @Benchmark
-  def run(bs: BenchmarkState): Unit = {
-    runImpl(bs)
-  }
+  def run(bs: BenchmarkState): Unit = runImpl(bs)
   override def mkSettings(bs: BenchmarkState): Settings = {
     val settings = super.mkSettings(bs)
     settings.Yrangepos.value = true

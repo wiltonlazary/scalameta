@@ -175,17 +175,22 @@ scalac -Xplugin:path/to.jar -Yrangepos [<pluginOption> ...] [<scalacOption> ...]
 ```
 
 The compiler plugin supports the following options that can be passed through
-Scalac in the form of `-P:semanticdb:<option>:<value>`
+Scalac in the form of
+```
+-P:semanticdb:<option>:<value>
+```
+(in the table below, the "Option" column refers only to the `<option>` part,
+and the "Value" column describes the `<value>` component):
 
 <table>
   <tr>
-    <td width="310px">Option</td>
+    <td>Option</td>
     <td>Value</td>
     <td>Explanation</td>
     <td>Default</td>
   </tr>
   <tr>
-    <td><code>-P:semanticdb:failures:&lt;value&gt;</code></td>
+    <td><code>failures</code></td>
     <td>
       <code>error</code>,<br/>
       <code>warning</code>,<br/>
@@ -198,7 +203,7 @@ Scalac in the form of `-P:semanticdb:<option>:<value>`
     <td><code>warning</code></td>
   </tr>
   <tr>
-    <td><code>-P:semanticdb:profiling:&lt;value&gt;</code></td>
+    <td><code>profiling</code></td>
     <td>
       <code>on</code>,<br/>
       <code>off</code><br/>
@@ -212,28 +217,32 @@ Scalac in the form of `-P:semanticdb:<option>:<value>`
     <td><code>off</code></td>
   </tr>
   <tr>
-    <td><code>-P:semanticdb:include:&lt;value&gt;</code></td>
+    <td><code>include</code></td>
     <td>Java regex</td>
     <td>Which source files to include in SemanticDB generation?</td>
     <td><code>.*</code></td>
   </tr>
   <tr>
-    <td><code>-P:semanticdb:exclude:&lt;value&gt;</code></td>
+    <td><code>exclude</code></td>
     <td>Java regex</td>
     <td>Which source files to exclude from SemanticDB generation?</td>
     <td><code>^$</code></td>
   </tr>
   <tr>
-    <td><code>-P:semanticdb:sourceroot:&lt;value&gt;</code></td>
+    <td><code>sourceroot</code></td>
     <td>Absolute or relative path</td>
     <td>
       Used to relativize source file paths into
       <code>TextDocument.uri</code>.
+      <br/>
+      If the value starts with <code>targetroot:</code>, the remaining part is 
+      interpreted as relative to <code>targetroot</code> (see below; must be
+      specified first) instead of current working directory.
     </td>
     <td>Current working directory</td>
   </tr>
   <tr>
-    <td><code>-P:semanticdb:targetroot:&lt;value&gt;</code></td>
+    <td><code>targetroot</code></td>
     <td>Absolute or relative path</td>
     <td>
       The output directory to produce <code>META-INF/semanticdb/**/*.semanticdb</code>
@@ -245,7 +254,7 @@ Scalac in the form of `-P:semanticdb:<option>:<value>`
     </td>
   </tr>
   <tr>
-    <td><code>-P:semanticdb:text:&lt;value&gt;</code></td>
+    <td><code>text</code></td>
     <td>
         <code>on</code>,<br/>
         <code>off</code>
@@ -258,7 +267,7 @@ Scalac in the form of `-P:semanticdb:<option>:<value>`
     <td><code>off</code></td>
   </tr>
   <tr>
-    <td><code>-P:semanticdb:md5:&lt;value&gt;</code></td>
+    <td><code>md5</code></td>
     <td>
         <code>on</code>,<br/>
         <code>off</code>
@@ -271,7 +280,7 @@ Scalac in the form of `-P:semanticdb:<option>:<value>`
     <td><code>on</code></td>
   </tr>
   <tr>
-    <td><code>-P:semanticdb:symbols:&lt;value&gt;</code></td>
+    <td><code>symbols</code></td>
     <td>
         <code>all</code>,<br/>
         <code>local-only</code>,<br/>
@@ -286,7 +295,7 @@ Scalac in the form of `-P:semanticdb:<option>:<value>`
     <td><code>all</code></td>
   </tr>
   <tr>
-    <td><code>-P:semanticdb:diagnostics:&lt;value&gt;</code></td>
+    <td><code>diagnostics</code></td>
     <td>
         <code>on</code>,<br/>
         <code>off</code>
@@ -299,7 +308,7 @@ Scalac in the form of `-P:semanticdb:<option>:<value>`
     <td><code>on</code></td>
   </tr>
   <tr>
-    <td><code>-P:semanticdb:synthetics:&lt;value&gt;</code></td>
+    <td><code>synthetics</code></td>
     <td>
         <code>on</code>,<br/>
         <code>off</code>
